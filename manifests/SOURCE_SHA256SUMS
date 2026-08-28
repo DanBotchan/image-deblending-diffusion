@@ -1,0 +1,4 @@
+# Original internal manifests before removing unused machine-local source columns.
+51bcd38b8766734c415907d55bb7526146d2bed556b16b0b9214b2544875a9fc  generalization/dataset.csv
+616ac50310136542d8576763faabf6bff38e8f8f06eb2c07196007e475921ac6  generalization/dataset_random_alpha_map.csv
+59e0193015937b4532ef1f1017b2e35c66f84f90f4702c29d962b6f5f03f24ad  generalization/dataset_random_alpha_scalar.csv

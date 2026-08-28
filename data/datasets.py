@@ -162,7 +162,13 @@ class DCBidToolDataset(BaseDataset):
             image1 = self.transform(image1)
             image2 = self.transform(image2)
 
-        alpha_gt = curr_pair[['a', 'b', 'c', 'd' ,'e', 'f']].values.tolist()
+        coefficients = ['a', 'b', 'c', 'd', 'e', 'f']
+        if all(name in curr_pair.index for name in coefficients):
+            alpha_gt = curr_pair[coefficients].values.tolist()
+        elif 'alpha' in curr_pair.index:
+            alpha_gt = [float(curr_pair['alpha']), 0.0, 0.0, 0.0, 0.0, 0.0]
+        else:
+            raise ValueError('Annotation row must contain alpha or coefficients a-f')
         return {'image1':image1,
                 'image1_path':str(image1_path),
                 'image1_class':image1_class,

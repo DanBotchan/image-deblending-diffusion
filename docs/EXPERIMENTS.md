@@ -7,7 +7,7 @@ This file is the release checklist connecting paper claims to executable code. "
 | Main known scalar | 300 pairs, 3 Stage-1 candidates, PickScore, one same-ID Stage-2 refinement | Packaged |
 | Main unknown scalar | 300 pairs, alpha in [0.2, 0.8], 3 candidates, PickScore, Stage 2 | Packaged |
 | Main spatial alpha | 300 pairs, polynomial alpha map, 3 candidates, PickScore, Stage 2 | Packaged |
-| Domain generalization | 100 Vehicle--Flower pairs for all three scenarios | Core configs packaged; exact held-out manifest/hash pending |
+| Domain generalization | 100 Vehicle--Flower pairs for all three scenarios | Core configs and exact held-out manifests/hashes packaged |
 | Two-stage ablation | Compare each selected Stage-1 candidate with its exact same-ID Stage-2 refinement | Evaluation code packaged; convenience command pending |
 | Text guidance | 100 pairs; none, standard CFG, class-level, cross-negative; CFG 1, 2, 3 | Core overrides supported; frozen experiment configs pending |
 | Timestep grid | Stage 1 start 20/40/60/80/100; Stage 2 start 50/200/350/500; 20 spatial pairs | Core overrides supported; sweep driver and exact subset manifest pending |

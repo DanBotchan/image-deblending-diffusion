@@ -1,6 +1,6 @@
 # Data preparation
 
-The paper evaluates 300 Fruit--Animal pairs and 100 held-out Vehicle--Flower pairs from the BIDeN benchmark. The benchmark and source-domain images remain subject to their upstream terms and are not copied here.
+The paper evaluates 300 Fruit--Animal pairs and 100 held-out Vehicle--Flower pairs from the BIDeN benchmark. The exact CSV manifests, prompts, alpha coefficients, and random seeds are included under `manifests/`; their release hashes are in `manifests/SHA256SUMS`. `SOURCE_SHA256SUMS` records the original internal files before unused machine-local provenance columns were removed. Source images remain subject to their upstream terms and are not copied here.
 
 Stage-1 annotation CSVs use these columns:
 

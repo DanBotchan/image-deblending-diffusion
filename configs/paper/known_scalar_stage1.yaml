@@ -39,4 +39,4 @@ alphas:
   pred_init_alpha_params: null
 
 datasets:
-  annotations_path: ${datasets.dataset_path}/dataset.csv
+  annotations_path: ${oc.env:DEBLEND_MANIFEST_ROOT,./manifests/comparison}/dataset.csv

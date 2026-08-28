@@ -34,9 +34,10 @@ Set the dataset root before running an experiment:
 ```bash
 export DEBLEND_DATA_ROOT=/absolute/path/to/BID_eval_v2
 export DEBLEND_OUTPUT_ROOT=$PWD/outputs
+export DEBLEND_MANIFEST_ROOT=$PWD/manifests/comparison
 ```
 
-The expected annotation files are:
+The exact annotation manifests are included under `manifests/comparison` and `manifests/generalization`. Their relative image paths resolve below `DEBLEND_DATA_ROOT`. The expected source-image layout is:
 
 ```text
 $DEBLEND_DATA_ROOT/
@@ -45,7 +46,7 @@ $DEBLEND_DATA_ROOT/
 └── dataset_random_alpha_map.csv
 ```
 
-See `docs/DATA.md` for the CSV schema and dataset preparation policy.
+See `docs/DATA.md` for the CSV schema and dataset preparation policy, and `docs/GENERALIZATION.md` for the held-out-domain commands.
 
 ## Reproduce the main method
 

@@ -41,4 +41,4 @@ alphas:
   pred_max: 0.8
 
 datasets:
-  annotations_path: ${datasets.dataset_path}/dataset_random_alpha_scalar.csv
+  annotations_path: ${oc.env:DEBLEND_MANIFEST_ROOT,./manifests/comparison}/dataset_random_alpha_scalar.csv
