@@ -1,0 +1,7 @@
+# Select an exact paper configuration with +paper=...
+defaults: []
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null

@@ -1,0 +1,26 @@
+# @package _global_
+defaults:
+  - /general: default
+  - /alphas: constant
+  - /datasets: BID_V2_second_stage
+  - /guidance: ddpm_pds
+  - /sampler: ddpm_ladibi
+  - /model: ddpm
+  - _self_
+
+general:
+  results_dir: "../outputs/stage2/"
+  exp_name: stage2
+  output_dir: "${general.results_dir}/${general.exp_name}/scales_${guidance.chaotic}_${guidance.critical}_${guidance.refine}_LPIPS_${general.lpips}_rec_${general.n_recurrence}_eta_${general.eta}_exc_${general.exc_scale}"
+
+  N_pairs: 10
+  shuffle_data: false
+  conditioning_method: ladibi_mpgd_ms
+  alpha_initialize: false
+  num_M: 0
+
+alphas:
+  gt_map_type: ??
+  gt_init_alpha_params: ??
+  pred_map_type: ??
+  pred_init_alpha_params: ??

@@ -1,0 +1,7 @@
+defaults:
+  - /sampler: default
+  - _self_
+
+type: ladibi
+timestep_respacing: 1000
+sample_from: 1000

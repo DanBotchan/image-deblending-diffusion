@@ -1,0 +1,5 @@
+defaults:
+  - ddpm_default
+  - _self_
+
+type: ladibi

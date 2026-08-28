@@ -1,0 +1,4 @@
+img_size: 256
+dataset_type: dc_bid_tool_second_stage
+dataset_path: ${oc.env:DEBLEND_DATA_ROOT,./data_external/BID_eval_v2}
+annotations_path: ${oc.env:DEBLEND_STAGE2_MANIFEST}

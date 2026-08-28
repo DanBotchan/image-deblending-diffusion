@@ -1,0 +1,4 @@
+guidance_method: three_stage_linear
+chaotic: 10.0
+critical: 30.0
+refine: 50.0

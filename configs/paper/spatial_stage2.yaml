@@ -1,0 +1,34 @@
+# @package _global_
+defaults:
+  - /_base: stage2
+  - override /alphas: adam
+  - override /datasets: BID_V2_second_stage
+  - _self_
+
+general:
+  seed: 232
+  output_dir: ${oc.env:DEBLEND_OUTPUT_ROOT,outputs}/spatial/stage2
+  save_each_steps: 100000
+  conditioning_method: ladibi_mpgd_ms
+  alpha_initialize: false
+  n_recurrence: 8
+  exc_scale: 0.0
+  lpips: 20
+  N_pairs: 300
+  dataset_subset: null
+  skip_finished: true
+
+guidance:
+  chaotic: 0.25
+  critical: 5.0
+  refine: 12.0
+
+sampler:
+  timestep_respacing: 600
+  start_idx: 350
+
+alphas:
+  gt_map_type: param_2d_order
+  gt_init_alpha_params: null
+  pred_map_type: param_2d_order
+  pred_init_alpha_params: null

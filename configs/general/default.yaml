@@ -1,0 +1,30 @@
+defaults:
+  - _self_
+
+results_path: outputs
+exp_name: run
+seed: 1
+
+N_pairs: 1
+N_samples_for_pair: 3
+shuffle_data: false
+skip_finished: false
+
+conditioning_method: ladibi_pds_ms
+alpha_initialize: false
+
+n_recurrence: 8
+eta: 0.0
+lpips: 0
+exc_scale: 0.0
+cfg: 1.0
+
+save_each_steps: 100000
+num_M: 0
+
+critical_start: 800
+critical_stop: 300
+
+use_amp: false
+compile_model: false
+lpips_freq: 4

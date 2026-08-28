@@ -1,0 +1,42 @@
+# @package _global_
+defaults:
+  - /_base: stage1
+  - override /alphas: constant
+  - override /datasets: BID_V2
+  - _self_
+
+general:
+  seed: 0
+  output_dir: ${oc.env:DEBLEND_OUTPUT_ROOT,outputs}/known_scalar/stage1
+  save_each_steps: 100000
+  conditioning_method: ladibi_pds_ms
+  alpha_initialize: false
+  cfg: 2.0
+  n_recurrence: 8
+  exc_scale: 0.0
+  lpips: 100
+  N_samples_for_pair: 3
+  N_pairs: 300
+  dataset_subset: null
+  skip_finished: true
+
+guidance:
+  chaotic: 10.0
+  critical: 30.0
+  refine: 50.0
+
+sampler:
+  timestep_respacing: 80
+  start_idx: 64
+
+prompts:
+  negative_template: "{neg_prompt}"
+
+alphas:
+  gt_map_type: param_2d_order
+  gt_init_alpha_params: null
+  pred_map_type: same
+  pred_init_alpha_params: null
+
+datasets:
+  annotations_path: ${datasets.dataset_path}/dataset.csv

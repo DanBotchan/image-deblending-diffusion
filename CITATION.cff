@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper."
+title: "Image Deblending with Diffusion Models"
+type: software
+authors:
+  - family-names: Botchan
+    given-names: Dan
+  - family-names: Hel-Or
+    given-names: Yacov
+  - family-names: Fried
+    given-names: Ohad
+version: 0.1.0
+date-released: 2026-08-28
+preferred-citation:
+  type: conference-paper
+  title: "Image Deblending with Diffusion Models"
+  authors:
+    - family-names: Botchan
+      given-names: Dan
+    - family-names: Hel-Or
+      given-names: Yacov
+    - family-names: Fried
+      given-names: Ohad
+  conference:
+    name: "IEEE/CVF Winter Conference on Applications of Computer Vision"
+  year: 2027

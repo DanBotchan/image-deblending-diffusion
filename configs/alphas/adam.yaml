@@ -1,0 +1,13 @@
+optimizer: param_adam_ms
+scheduler: three_stage
+controller: multi_step
+
+gt_min: 0.0
+gt_max: 1.0
+pred_min: 0.0
+pred_max: 1.0
+
+gt_map_type: ???
+gt_init_alpha_params: ???
+pred_map_type: ???
+pred_init_alpha_params: ???

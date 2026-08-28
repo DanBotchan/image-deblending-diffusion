@@ -1,0 +1,4 @@
+img_size: 512
+dataset_type: dc_bid_tool
+dataset_path: ${oc.env:DEBLEND_DATA_ROOT,./data_external/BID_eval_v2}
+annotations_path: ${datasets.dataset_path}/dataset.csv
