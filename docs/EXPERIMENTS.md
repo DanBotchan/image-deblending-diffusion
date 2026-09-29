@@ -15,7 +15,7 @@ This file is the release checklist connecting paper claims to executable code. "
 | PickScore vs CLIP | Same 3 Stage-1 candidates; freeze selection before matching Stage 2 | PickScore packaged; CLIP selector comparison pending |
 | Candidate budget | 10 pairs/scenario; cumulative 1/2/3/4/6/8/12/16 candidates | Core sampling supports 16 candidates; cumulative selector analysis pending |
 | Automated prompts | Qwen2-VL-7B-Instruct preliminary 20 and held-out end-to-end 80 | Revision-pinned VLM prompt generator and frozen instruction packaged; end-to-end convenience runner pending |
-| DoubleDIP best-of-three | 300 comparison + 100 generalization pairs, all scenarios | External adapter pending; iteration-count discrepancy must be resolved |
+| DoubleDIP best-of-three | 300 comparison + 100 generalization pairs, all scenarios | External adapter pending; 8,000 iterations (verified from run logs) |
 
 ## Canonical method settings
 
