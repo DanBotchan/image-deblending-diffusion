@@ -33,24 +33,47 @@ Set the dataset root before running an experiment:
 
 ```bash
 export DEBLEND_DATA_ROOT=/absolute/path/to/BID_eval_v2
-export DEBLEND_OUTPUT_ROOT=$PWD/outputs
-export DEBLEND_MANIFEST_ROOT=$PWD/manifests/comparison
+export DEBLEND_OUTPUT_ROOT=$PWD/outputs        # optional, default ./outputs
 ```
 
-The exact annotation manifests are included under `manifests/comparison` and `manifests/generalization`. Their relative image paths resolve below `DEBLEND_DATA_ROOT`. The expected source-image layout is:
+The exact annotation manifests (pairs, prompts, alpha coefficients, seeds) are versioned under
+`manifests/comparison` and `manifests/generalization`. Their relative image paths resolve below
+`DEBLEND_DATA_ROOT`, which must contain the source images:
 
 ```text
 $DEBLEND_DATA_ROOT/
-├── dataset.csv
-├── dataset_random_alpha_scalar.csv
-└── dataset_random_alpha_map.csv
+└── pairs/
+    ├── pair_000/img1.png, img2.png, blended_polynomial.png, ...
+    └── ...
 ```
 
-See `docs/DATA.md` for the CSV schema and dataset preparation policy, and `docs/GENERALIZATION.md` for the held-out-domain commands.
+See `docs/DATA.md` for the CSV schema and dataset preparation policy.
 
-## Reproduce the main method
+## Reproduce the paper
 
-Choose one scenario: `known_scalar`, `unknown_scalar`, or `spatial`.
+One driver runs every experiment end to end (Stage 1, ground-truth-free selection, Stage 2,
+evaluation) and writes the corresponding table to `summary.md`:
+
+```bash
+# Check the installation in a few minutes: 1 pair, ~10x fewer steps (numbers are meaningless)
+python scripts/reproduce.py main --scenario spatial --smoke
+
+# Main result and two-stage ablation for one scenario, sharded over four GPUs
+python scripts/reproduce.py main --scenario known_scalar --gpus 0,1,2,3
+
+# Held-out Vehicles/Flowers domains
+python scripts/reproduce.py main --scenario spatial --split generalization \
+  --data-root /absolute/path/to/BID_generalization --gpus 0,1,2,3
+```
+
+Scenarios are `known_scalar`, `unknown_scalar` and `spatial`. The supplementary experiments
+are `text-guidance`, `timestep`, `recurrence`, `selector`, `candidate-budget` and
+`auto-prompts`; `docs/EXPERIMENTS.md` maps each paper table to its command and protocol.
+Add `--dry-run` to print every command without running it. Rerunning a command resumes it.
+
+### Running the stages by hand
+
+The driver chains the same four scripts (shown here for `known_scalar` with the default paths):
 
 ```bash
 python scripts/first_stage.py +paper=known_scalar_stage1
@@ -59,8 +82,8 @@ python scripts/select_candidates.py \
   outputs/known_scalar/stage1/results \
   --output-csv outputs/known_scalar/selected.csv
 
-export DEBLEND_STAGE2_MANIFEST=$PWD/outputs/known_scalar/selected.csv
-python scripts/second_stage.py +paper=known_scalar_stage2
+python scripts/second_stage.py +paper=known_scalar_stage2 \
+  datasets.annotations_path=$PWD/outputs/known_scalar/selected.csv
 
 python scripts/evaluate_artifact_tree.py \
   outputs/known_scalar/stage2/results \
@@ -71,7 +94,10 @@ python scripts/evaluate_artifact_tree.py \
   --expected-pairs 300
 ```
 
-The optimized-alpha scenarios use `100` Stage-1 steps starting at `80`; known scalar uses `80` steps starting at `64`. All Stage-2 scenarios use `600` steps starting at `350` and eight recurrence iterations.
+The optimized-alpha scenarios use `100` Stage-1 steps starting at `80`; known scalar uses
+`80` steps starting at `64`. All Stage-2 scenarios use `600` steps starting at `350` and
+eight recurrence iterations. One Stage-1 candidate takes roughly 10-18 minutes and one Stage-2
+refinement roughly 18 minutes on an RTX 3090.
 
 ## Tests
 
@@ -79,11 +105,14 @@ The optimized-alpha scenarios use `100` Stage-1 steps starting at `80`; known sc
 pytest
 ```
 
-The unit tests cover artifact discovery, source-order reassignment, same-candidate Stage-1/Stage-2 lineage, metric aggregation, and selector protocol behavior.
+The tests need no GPU. They cover artifact discovery, source-order reassignment,
+same-candidate Stage-1/Stage-2 lineage, metric aggregation, the selection rules, and that
+every command emitted by `scripts/reproduce.py` composes to the intended Hydra config.
 
-## Baselines and supplementary experiments
+## Baselines
 
-Baseline implementations are not vendored. `docs/BASELINES.md` records the upstream methods and the paper adaptations. `docs/EXPERIMENTS.md` maps every main-paper and supplementary experiment to its release command or remaining packaging task.
+Baseline implementations are not vendored. `docs/BASELINES.md` records the upstream methods,
+the paper adaptations, and the DoubleDIP adapter in `baselines/doubledip/`.
 
 ## License status
 

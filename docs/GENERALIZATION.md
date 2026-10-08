@@ -1,18 +1,15 @@
 # Held-out domain generalization
 
-The exact 100-pair Vehicle--Flower manifests are in `manifests/generalization/`. Point the same paper configs at those images and manifests while writing to a separate output root:
+The exact 100-pair Vehicle--Flower manifests are in `manifests/generalization/`. Run the main
+experiment on them with the same method configuration, pointing `--data-root` at the
+generalization images:
 
 ```bash
-export DEBLEND_DATA_ROOT=/absolute/path/to/BID_generalization
-export DEBLEND_MANIFEST_ROOT=$PWD/manifests/generalization
-export DEBLEND_OUTPUT_ROOT=$PWD/outputs/generalization
-
-python scripts/first_stage.py +paper=known_scalar_stage1 general.N_pairs=100
-python scripts/select_candidates.py \
-  outputs/generalization/known_scalar/stage1/results \
-  --output-csv outputs/generalization/known_scalar/selected.csv
-export DEBLEND_STAGE2_MANIFEST=$PWD/outputs/generalization/known_scalar/selected.csv
-python scripts/second_stage.py +paper=known_scalar_stage2 general.N_pairs=100
+for S in known_scalar unknown_scalar spatial; do
+  python scripts/reproduce.py main --scenario $S --split generalization \
+    --data-root /absolute/path/to/BID_generalization --gpus 0,1,2,3
+done
 ```
 
-Repeat with `unknown_scalar` and `spatial`. The configs keep the same method parameters; only the source domains, manifest root, pair count, and output root change.
+Results are written to `$DEBLEND_OUTPUT_ROOT/generalization/main/<scenario>/summary.md`. Only the
+source domains, manifests and pair count differ from the comparison split.
