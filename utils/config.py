@@ -2,10 +2,9 @@
 Experiment configuration class for the deblend package.
 """
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, TYPE_CHECKING
 
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
@@ -13,6 +12,9 @@ from omegaconf import DictConfig
 
 from . import Device, TRANSFORM
 from .file import save_yaml, save_json, load_json
+
+if TYPE_CHECKING:
+    from alphas.alpha_maps import AlphaMap
 
 
 class ExpConfig:

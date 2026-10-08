@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-from helpers.exclusion_loss import ExclusionLoss
 from utils.image import show_tensor  # noqa: F401
 from .registry import register_alpha_optimizer
 

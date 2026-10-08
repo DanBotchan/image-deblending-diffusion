@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 from .io import group_by_pair, read_rows, resolve_artifact_path
 from .models import ExperimentSpec, Issue, ProtocolResult

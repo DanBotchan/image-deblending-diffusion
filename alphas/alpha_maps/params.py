@@ -429,6 +429,4 @@ class ParamSpatialFullMap(AlphaMap):
 
     def __str__(self):
         """String representation showing the spatial dimensions."""
-        num_params = self.alpha_params.numel()
-        memory_mb = num_params * 4 / (1024 * 1024)  # 4 bytes per float32
         return f'α(X,Y) = Spatial[{self.size[0]}×{self.size[1]}]'

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from alphas.alpha_maps import AlphaMap
     from conditions.base import ConditionBase
     from utils.config import ExpConfig
+    from operators.blend import BlendOperator
 
 
 class BaseSampler(ABC):

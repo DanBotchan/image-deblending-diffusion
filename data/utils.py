@@ -29,7 +29,9 @@ class SubsetSampler(Sampler):
                                               size=N_images,
                                               replace=False)
         elif subset is not None:
-            subset_indices = np.arange(*subset)
+            # Clamp so that shards defined over an upper bound stay in range.
+            start, stop = subset
+            subset_indices = np.arange(min(start, len(dataset)), min(stop, len(dataset)))
 
         else:
             subset_indices = np.arange(len(dataset))

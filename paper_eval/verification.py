@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 from typing import Any
 
 from .io import resolve_artifact_path

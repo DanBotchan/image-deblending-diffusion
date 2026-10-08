@@ -1,9 +1,8 @@
 """
 Image utility functions for the deblend package.
 """
-import os
 from pathlib import Path
-from typing import Union, Optional, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np

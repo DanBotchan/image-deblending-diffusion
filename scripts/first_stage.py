@@ -1,4 +1,17 @@
-import time
+"""Stage 1: joint latent-diffusion sampling of both sources (Stable Diffusion v1.4).
+
+Run with an exact paper configuration, e.g. ``python scripts/first_stage.py +paper=spatial_stage1``.
+Writes ``<general.output_dir>/results/pair_XXX/smp_YYYY/`` per candidate.
+"""
+import os
+import sys
+from pathlib import Path
+
+# transformers must not import TensorFlow (version clashes in mixed environments).
+os.environ.setdefault("USE_TF", "0")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import time  # noqa: E402
 from typing import Dict, Any
 
 import hydra
@@ -12,7 +25,7 @@ from data.utils import get_data_as_dataloader
 from models.latent_diffusion.scale_factor_methods import get_scale_scheduler
 from operators import get_operator
 from samplers.latent.registry import get_sampler
-from utils import show_tensor, set_seed, get_logger, TRANSFORM, flush  # noqa: F401
+from utils import set_seed, get_logger, TRANSFORM, flush
 from utils.config import (get_config_class,
                           reload_from_disk,
                           save_details_json,
@@ -25,8 +38,6 @@ from utils.exp_ops import (get_model_latent,
                            )
 from utils import save_results
 from utils.metrics import compute_metrics
-
-
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")

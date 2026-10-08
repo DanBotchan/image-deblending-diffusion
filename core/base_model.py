@@ -5,7 +5,7 @@ Provides abstract base class for model wrappers that unifies the interface
 between latent-space (Stable Diffusion) and pixel-space (DDPM) models.
 """
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
+from typing import Optional
 
 import torch
 

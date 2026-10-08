@@ -9,13 +9,12 @@ from typing import Dict, Any, Union
 
 import numpy as np
 import torch
-import torchvision.transforms as transforms
 from PIL import Image
 
 from alphas.alpha_maps.registry import get_alpha_map
 from . import Device, TRANSFORM
-from .file import load_json
-from .config import load_details_json, load_alphas_json, ExpConfig
+from .config import load_details_json, load_alphas_json
+from .config import ExpConfig  # noqa: F401  (re-exported)
 
 
 # ---------------------------------------------------------------------------

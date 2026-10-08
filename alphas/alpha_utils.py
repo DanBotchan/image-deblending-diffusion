@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from .controllers import (get_alpha_controller,
                           AlphaController,
                           )
 from .optimizers import get_optimizer
 from .schedulers import get_scheduler
+
+if TYPE_CHECKING:
+    from utils.config import ExpConfig
 
 
 def build_controller(exp_config: "ExpConfig",

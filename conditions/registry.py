@@ -3,8 +3,7 @@ from core.registry import Registry
 from alphas.controllers import AlphaController
 from operators.base import LinearOperator
 from models.latent_diffusion.scale_factor_methods import BaseScheduler
-from utils.exp_ops import (ExpConfig,
-                           Device, )
+from utils.exp_ops import (ExpConfig, )
 
 CATEGORY = 'conditioning_method'
 

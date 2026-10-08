@@ -5,7 +5,7 @@ Provides a generic factory pattern for registering and retrieving
 components by category and name. All module-level registries delegate
 to this single implementation.
 """
-from typing import Dict, Type, Any, List, Callable
+from typing import Dict, Type, Any, Callable
 
 
 class Registry:

@@ -1,5 +1,17 @@
-import time
+"""Stage 2: pixel-space refinement of selected Stage-1 candidates (guided-diffusion 256x256).
+
+Run with an exact paper configuration and a selection manifest, e.g.
+``python scripts/second_stage.py +paper=spatial_stage2 datasets.annotations_path=selected.csv``.
+"""
+import os
+import sys
 from pathlib import Path
+
+# transformers must not import TensorFlow (version clashes in mixed environments).
+os.environ.setdefault("USE_TF", "0")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import time  # noqa: E402
 from typing import Dict, Any
 
 import hydra
@@ -12,7 +24,7 @@ from conditions import get_cond_method
 from data.utils import get_data_as_dataloader
 from models.latent_diffusion.scale_factor_methods import get_scale_scheduler
 from operators import get_operator
-from utils import show_tensor, set_seed, get_logger, TRANSFORM, flush  # noqa: F401
+from utils import set_seed, get_logger, TRANSFORM, flush
 from utils.config import (get_config_class,
                           reload_from_disk,
                           save_details_json,
@@ -25,8 +37,6 @@ from utils.exp_ops import (get_model_pixel,
                            )
 from utils import save_results
 from utils.metrics import compute_metrics
-
-
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
@@ -68,11 +78,8 @@ def run_pipeline(cfg: Dict[str, Any]) -> None:
         exp_config.set_smp(smp_num=smp_num)
 
         if exp_config['general']['skip_finished']:
-            out_path = Path(exp_config['general']['output_dir'],
-                            'results',
-                            f'pair_{pair_num:03}',
-                            f'smp_{smp_num:04}')
-            if out_path.exists():
+            if (exp_config.get_path('results', include_smp=True) /
+                    'sample1.png').exists():
                 continue
 
         alpha_map_gt = create_alpha_map_gt_stage2(exp_config=exp_config,
