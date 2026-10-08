@@ -47,7 +47,7 @@ auto-prompts = ["accelerate==0.27.0"]
 where = ["."]
 include = [
   "alphas*", "conditions*", "core*", "data*", "helpers*", "models*",
-  "operators*", "paper_eval*", "samplers*", "utils*",
+  "operators*", "paper_eval*", "paper_repro*", "samplers*", "utils*",
 ]
 
 [tool.pytest.ini_options]

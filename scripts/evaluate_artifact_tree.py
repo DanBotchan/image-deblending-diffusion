@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import sys
 from pathlib import Path
@@ -11,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from paper_eval.aggregate import aggregate_metrics
-from paper_eval.artifact_tree import discover_candidates, evaluate_artifact_tree
+from paper_eval.artifact_tree import discover_candidates, evaluate_artifact_candidates
 from paper_eval.io import write_csv, write_json
 from paper_eval.models import Issue
 
@@ -31,6 +32,21 @@ def tree_fingerprint(candidates: dict[tuple[str, str], Path]) -> str:
     return digest.hexdigest()
 
 
+def pinned_candidates(manifest: Path) -> tuple[dict[tuple[str, str], Path], list[Issue]]:
+    """Candidate directories listed in a selection manifest, keyed by pair/sample."""
+    found: dict[tuple[str, str], Path] = {}
+    issues: list[Issue] = []
+    with manifest.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            candidate = Path(row["sample1_path"]).parent
+            key = (row["pair"], row["sample"])
+            if (candidate.parent.name, candidate.name) != key:
+                issues.append(Issue("error", "manifest_identity_mismatch", manifest.name,
+                                    f"{candidate} does not encode {key}", key[0]))
+            found[key] = candidate
+    return found, issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("artifact_root", type=Path)
@@ -41,11 +57,19 @@ def main() -> int:
     parser.add_argument("--expected-pairs", type=int, required=True)
     parser.add_argument("--resolution", type=int, default=256)
     parser.add_argument("--no-lpips", action="store_true")
+    parser.add_argument("--candidates-csv", type=Path,
+                        help="Evaluate only the candidate directories named by this "
+                             "selection manifest (e.g. the selected Stage-1 outputs).")
+    parser.add_argument("--candidates-per-pair", type=int, default=1,
+                        help="Required candidates per pair; 0 accepts any number.")
     args = parser.parse_args()
 
-    candidates, discovery_issues = discover_candidates(args.artifact_root)
-    rows, issues = evaluate_artifact_tree(
-        args.artifact_root,
+    if args.candidates_csv:
+        candidates, discovery_issues = pinned_candidates(args.candidates_csv)
+    else:
+        candidates, discovery_issues = discover_candidates(args.artifact_root)
+    rows, issues = evaluate_artifact_candidates(
+        candidates,
         args.project_root,
         args.experiment,
         resolution=args.resolution,
@@ -66,9 +90,10 @@ def main() -> int:
     for row in rows:
         counts[row["pair"]] = counts.get(row["pair"], 0) + 1
     for pair, count in counts.items():
-        if count != 1:
+        if args.candidates_per_pair and count != args.candidates_per_pair:
             issues.append(
-                Issue("error", "unexpected_candidate_count", args.experiment, f"Expected 1, found {count}", pair)
+                Issue("error", "unexpected_candidate_count", args.experiment,
+                      f"Expected {args.candidates_per_pair}, found {count}", pair)
             )
 
     metrics, metric_issues = aggregate_metrics(args.experiment, rows)

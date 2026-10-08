@@ -32,3 +32,25 @@ def test_discover_requires_exact_candidate_budget(tmp_path):
 
     with pytest.raises(RuntimeError, match="expected 4 candidates"):
         discover(tmp_path, expected_candidates=4)
+
+
+def scored(samples_and_scores):
+    return [{"pair": "pair_000", "sample": s, "score": v} for s, v in samples_and_scores]
+
+
+def test_select_respects_budget_and_ties():
+    from paper_repro.selection import select
+    pool = scored([("smp_0000", 1.0), ("smp_0001", 3.0), ("smp_0002", 3.0), ("smp_0003", 9.0)])
+    assert select(pool)["sample"] == "smp_0003"
+    assert select(pool, budget=1)["sample"] == "smp_0000"
+    # Ties keep the lower sample ID.
+    assert select(pool, budget=3)["sample"] == "smp_0001"
+
+
+def test_first_selector_needs_no_model(tmp_path):
+    from paper_repro.selection import score_candidates, select
+    for sample in range(2):
+        make_candidate(tmp_path, 0, sample)
+    grouped = discover(tmp_path, expected_candidates=2)
+    score_candidates(grouped, "first")
+    assert select(grouped["pair_000"])["sample"] == "smp_0000"
