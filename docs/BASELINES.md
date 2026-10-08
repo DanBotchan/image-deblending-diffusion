@@ -37,7 +37,7 @@ consistent alternative is given next to each.
 |---|---|---|---|
 | BIDeN, unknown scalar, held-out | spatial model `BID_random_alpha/.../alpha_map` (best) | scalar model `experiment_scalar` (latest) | 14.52 / 15.65 -> 15.14 / 16.16 |
 | DAD, known scalar, held-out | outputs clipped to [0, 1] without the x2 rescale | `--clip_max 0.5` | 11.09 / 11.45 -> 14.43 / 14.42 |
-| LCD, known scalar, held-out | sampler `ours_epsilon` | sampler `ours` | see `docs/VERIFICATION.md` |
+| LCD, known scalar, held-out | sampler `ours_epsilon` (stated in the paper) | sampler `ours` | 17.21 / 17.19 -> 16.62 / 16.62 |
 
 ## BIDeN
 
