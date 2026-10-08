@@ -45,9 +45,9 @@ def shards(start: int, end: int, count: int) -> list[tuple[int, int]]:
 def smoke_overrides(overrides: Sequence[str]) -> list[str]:
     """Shrink step and recurrence counts ~10x so a pipeline finishes in minutes.
 
-    The grid structure is kept (each swept value maps to a distinct smaller
-    value), which is enough to exercise every code path; the numbers produced
-    are meaningless.
+    Every grid cell still runs (swept steps/starts stay distinct; recurrence
+    counts are capped at 2), which exercises every code path. The numbers
+    produced are meaningless.
     """
     result = []
     for item in overrides:
