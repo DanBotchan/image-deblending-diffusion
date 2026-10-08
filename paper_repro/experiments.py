@@ -358,21 +358,35 @@ def candidate_budget(ctx: Context, scenario: str) -> Phases:
 # Automated prompts (Qwen2-VL from the blended observation only)
 # ---------------------------------------------------------------------------
 
-FROZEN_AUTO_PROMPTS = REPO / "manifests" / "auto_prompts" / "dataset_random_alpha_map_auto.csv"
+# Frozen Qwen2-VL prompts (pairs 0-99), written into two manifests:
+#   AS RUN (paper tables): the known-scalar manifest, so the Auto arm is sampled
+#     on alpha = 0.5 blends while None/Manual use the spatial blends;
+#   matched (--matched-blends): the spatial manifest, so all arms share blends.
+FROZEN_AUTO_PROMPTS = {
+    "as_run": REPO / "manifests" / "auto_prompts" / "dataset_auto_as_run.csv",
+    "matched": REPO / "manifests" / "auto_prompts" / "dataset_random_alpha_map_auto.csv",
+}
 AUTO_ARMS = ("none", "auto", "manual")
 
 
 def automated_prompts(ctx: Context, scenario: str = "spatial") -> Phases:
     """Preliminary Stage-1 study on pairs 0-19 and end-to-end confirmation on 20-99.
 
-    AS RUN: Stage 1 used the 80-step/64-start sampler and Stage 2 a fixed alpha.
+    AS RUN: Stage 1 used the 80-step/64-start sampler, Stage 2 a fixed alpha, and
+    the Auto arm the alpha = 0.5 blends (prompts still come from the spatial
+    blend). ``matched_blends`` samples the Auto arm on the spatial blends instead.
     """
     root = ctx.out
     manual = ctx.manifest("spatial")
-    auto = FROZEN_AUTO_PROMPTS if ctx.frozen_prompts else root / "auto_prompts.csv"
+    variant = "matched" if ctx.extra.get("matched_blends") else "as_run"
+    auto = FROZEN_AUTO_PROMPTS[variant] if ctx.frozen_prompts else root / f"auto_prompts_{variant}.csv"
     phases: Phases = []
     if not ctx.frozen_prompts:
-        argv = python("scripts/generate_auto_prompts.py", manual, "--data-root", ctx.data_root,
+        # The VLM always sees the spatial blend; the manifest it writes into
+        # decides which blend the Auto arm is sampled on.
+        source = manual if variant == "matched" else ctx.manifest("known_scalar")
+        argv = python("scripts/generate_auto_prompts.py", source, "--data-root", ctx.data_root,
+                      "--blended-column", "blended_polynomial_path",
                       "--output-csv", auto, "--start", 0, "--end", 100)
         if ctx.offline:
             argv.append("--offline")

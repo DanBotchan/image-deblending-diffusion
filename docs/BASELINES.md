@@ -30,11 +30,12 @@ python scripts/evaluate_artifact_tree.py outputs/doubledip/$S/samples \
 
 The adapter keeps the optimization used for the paper (two image DIPs plus an alpha DIP in
 the optimized-alpha scenarios, reconstruction MSE + 0.1 x exclusion loss + an early alpha
-prior, best re-blend iterate). It differs from the paper runs in one respect: the original
-script reordered each output pair against the ground truth before selection, and its selector
-scored only the direct prompt-image order. The adapter never reads ground truth, and selection
-uses the same permutation-invariant rule as our method.
+prior, best re-blend iterate). By default it never reads ground truth before evaluation and
+selection uses the same permutation-invariant rule as our method. The paper's best-of-three
+table instead reordered each output pair to the ground-truth sources and scored only that
+order; reproduce it with `run_doubledip.py --order-by-ground-truth` and
+`select_candidates.py --direct-order`.
 
 ## Resolved: DoubleDIP iteration count
 
-Earlier manuscript versions gave two DoubleDIP iteration counts (4,000 in the baseline-training section, 8,000 in the best-of-three section). The raw run logs (`Experiments/DoubleDIP_3samples_queue.log`, `Experiments/DoubleDIP_3samples_HANDOFF.md`) record `num_iter=8000` for the best-of-three runs used in the main comparison. The release and the thesis use 8,000.
+Earlier manuscript versions gave two DoubleDIP iteration counts (4,000 and 8,000). The run logs record `num_iter=8000` for the best-of-three runs used in the main comparison; the paper and this release use 8,000.

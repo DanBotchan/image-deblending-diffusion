@@ -29,6 +29,7 @@ fewer steps to check an installation in minutes (its numbers are meaningless).
 Candidate-budget seeds beyond the ten stored per pair are derived deterministically
 (`paper_repro.experiments.budget_seed`). `auto-prompts` uses the frozen VLM output in
 `manifests/auto_prompts/`; pass `--generate-prompts` to rerun Qwen2-VL instead.
+`scripts/render_timestep_heatmaps.py <timestep summary.csv>` draws the supplementary heatmaps.
 
 ## Canonical method settings
 
@@ -55,11 +56,12 @@ The drivers reproduce what was run. These deviations are therefore encoded expli
   Stage-2 alpha. The *unknown-scalar* rows were sampled with the known-scalar configuration on
   the unknown-scalar pairs, so the true alpha was given to the method.
 - **Automated prompts**: Stage 1 uses the 80-step/64-start sampler and Stage 2 a fixed alpha.
-  The driver runs all three arms (none / auto / manual) on the same spatially varying blends.
-  In the run behind the submitted table, the Auto arm's prompt file had been derived from the
-  known-scalar manifest, so that arm was sampled on alpha = 0.5 blends while None and Manual
-  used the spatial blends. The driver fixes this, so its Auto numbers are not expected to match
-  that table.
+  As described in the paper, the VLM prompts come from the spatially varying blend, but the
+  Auto arm is sampled on the alpha = 0.5 blend of the same pair, while None and Manual use the
+  spatial blends (`manifests/auto_prompts/dataset_auto_as_run.csv`). Add `--matched-blends` to
+  sample all three arms on the same spatial blends, which is the comparison the study intended.
+- **DoubleDIP best-of-three**: the paper's selection paired outputs with prompts in
+  ground-truth source order; see `docs/BASELINES.md` for the flags that reproduce it.
 
 ## Determinism
 

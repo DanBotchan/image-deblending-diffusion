@@ -36,6 +36,9 @@ def main() -> int:
                              "manifest then holds every distinct winner across budgets.")
     parser.add_argument("--all", action="store_true",
                         help="Write every candidate to the manifest (selector comparison).")
+    parser.add_argument("--direct-order", action="store_true",
+                        help="Pair output i with prompt i instead of taking the better assignment "
+                             "(the paper's DoubleDIP protocol).")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--offline", action="store_true")
@@ -43,7 +46,8 @@ def main() -> int:
 
     root = args.stage1_root.resolve()
     grouped = discover(root, args.expected_candidates)
-    score_candidates(grouped, args.selector, args.device, args.batch_size, args.offline)
+    score_candidates(grouped, args.selector, args.device, args.batch_size, args.offline,
+                     args.direct_order)
 
     output = args.output_csv
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -74,7 +78,7 @@ def main() -> int:
         "expected_candidates_per_pair": args.expected_candidates,
         "manifest_rows": len(rows),
         "budgets": args.budgets,
-        **selector_provenance(args.selector),
+        **selector_provenance(args.selector, args.direct_order),
         "ground_truth_used": False,
         "output_csv_sha256": sha256(output),
         "scores_json_sha256": sha256(score_path),

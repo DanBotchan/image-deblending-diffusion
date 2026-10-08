@@ -53,6 +53,9 @@ def main() -> int:
                         help="selector: existing 3-candidate Stage-1 tree to reuse")
     parser.add_argument("--generate-prompts", action="store_true",
                         help="auto-prompts: rerun Qwen2-VL instead of using the frozen prompts")
+    parser.add_argument("--matched-blends", action="store_true",
+                        help="auto-prompts: sample the Auto arm on the same spatial blends as None/Manual "
+                             "(the paper tables used alpha = 0.5 blends for Auto)")
     parser.add_argument("--offline", action="store_true", help="Load selector/VLM weights from cache only")
     parser.add_argument("--dry-run", action="store_true", help="Print the commands and exit")
     parser.add_argument("--no-table", action="store_true")
@@ -73,7 +76,8 @@ def main() -> int:
     ctx = Context(out=out, data_root=args.data_root.resolve(), split=args.split, slots=len(gpus),
                   smoke=args.smoke, pairs=1 if args.smoke else args.pairs, offline=args.offline,
                   frozen_prompts=not args.generate_prompts,
-                  extra={"stage1_root": args.stage1_root.resolve() if args.stage1_root else None})
+                  extra={"stage1_root": args.stage1_root.resolve() if args.stage1_root else None,
+                         "matched_blends": args.matched_blends})
     phases = builder(ctx, scenario)
     write_protocol(ctx, args.experiment, scenario, phases)
     print(f"{args.experiment} / {scenario} -> {out}")

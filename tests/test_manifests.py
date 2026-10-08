@@ -45,3 +45,14 @@ def test_auto_prompt_manifest_only_replaces_prompts():
     assert auto[others].equals(manual[others])
     changed = (auto[prompts] != manual[prompts]).any(axis=1)
     assert changed[:100].all() and not changed[100:].any()
+
+
+def test_as_run_auto_manifest_is_known_scalar_with_auto_prompts():
+    """The paper's Auto arm: known-scalar rows (alpha 0.5) carrying the VLM prompts."""
+    known = pd.read_csv(ROOT / "manifests/comparison/dataset.csv")
+    matched = pd.read_csv(ROOT / "manifests/auto_prompts/dataset_random_alpha_map_auto.csv")
+    as_run = pd.read_csv(ROOT / "manifests/auto_prompts/dataset_auto_as_run.csv")
+    prompts = ["img1_prompt", "img2_prompt"]
+    others = [column for column in known.columns if column not in prompts]
+    assert as_run[others].equals(known[others])
+    assert as_run[prompts].equals(matched[prompts])

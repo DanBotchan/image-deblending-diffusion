@@ -122,3 +122,15 @@ def test_budget_seeds_extend_stored_seeds(tmp_path):
     seeds = ast.literal_eval(rows[0]["z_seeds"])
     assert len(seeds) == 16 == len(set(seeds))
     assert seeds[10] == budget_seed(rows[0]["pair_id"], 10)
+
+
+def test_auto_prompt_arms_as_run_and_matched(tmp_path):
+    def manifests(**extra):
+        found = {}
+        for name, script, cfg in sampling_configs("auto-prompts", "spatial", tmp_path, extra=extra):
+            if script == "first_stage.py":
+                found[name.split(".")[1]] = Path(cfg["datasets"]["annotations_path"]).name
+        return found
+    assert manifests() == {"none": "dataset_random_alpha_map.csv", "auto": "dataset_auto_as_run.csv",
+                           "manual": "dataset_random_alpha_map.csv"}
+    assert manifests(matched_blends=True)["auto"] == "dataset_random_alpha_map_auto.csv"

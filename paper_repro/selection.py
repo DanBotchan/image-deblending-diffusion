@@ -96,8 +96,14 @@ def score_candidates(
     device: str = "cuda",
     batch_size: int = 8,
     offline: bool = False,
+    direct_order: bool = False,
 ) -> None:
-    """Attach ``score``, ``assignment_swapped`` and ``score_matrix`` to every candidate."""
+    """Attach ``score``, ``assignment_swapped`` and ``score_matrix`` to every candidate.
+
+    ``direct_order`` scores only output i against prompt i (the paper's DoubleDIP
+    protocol, whose outputs were pre-ordered); the default keeps the better of the
+    two assignments.
+    """
     pending = [item for candidates in grouped.values() for item in candidates]
     if selector == "first":
         for item in pending:
@@ -142,8 +148,8 @@ def score_candidates(
         for item, matrix in zip(batch, matrices.detach().cpu().tolist()):
             direct = matrix[0][0] + matrix[1][1]
             swapped = matrix[0][1] + matrix[1][0]
-            item["assignment_swapped"] = swapped > direct
-            item["score"] = max(direct, swapped) / 2.0
+            item["assignment_swapped"] = swapped > direct and not direct_order
+            item["score"] = (direct if direct_order else max(direct, swapped)) / 2.0
             item["score_matrix"] = matrix
         print(f"[{selector}] scored {min(offset + len(batch), len(pending))}/{len(pending)}", flush=True)
 
@@ -197,13 +203,14 @@ def write_scores(path: Path, grouped: dict[str, list[dict[str, Any]]]) -> None:
     path.write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
 
 
-def selector_provenance(selector: str) -> dict[str, Any]:
+def selector_provenance(selector: str, direct_order: bool = False) -> dict[str, Any]:
     if selector == "first":
         return {"selector": "first", "rule": "first sample ID (no scoring)"}
     spec = PICKSCORE if selector == "pickscore" else CLIP
     return {
         "selector": selector,
         **spec,
-        "rule": "maximum mean score over the better of the two prompt-image assignments",
+        "rule": ("maximum mean score with output i paired to prompt i" if direct_order else
+                 "maximum mean score over the better of the two prompt-image assignments"),
         "tie_break": "first sample ID",
     }

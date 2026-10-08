@@ -18,6 +18,12 @@ Adam, lr 1e-3, 8000 iterations at 256x256. The returned iterate is the one
 whose re-blend best matches the observation (no ground truth is used).
 Each (pair, sample) is seeded with ``seed + pair * num_samples + sample``.
 
+The paper's runs additionally reordered each output pair to best match the
+ground-truth sources (by PSNR, mapping alpha to 1 - alpha) before selection,
+and selected with ``scripts/select_candidates.py --direct-order``; pass
+``--order-by-ground-truth`` to reproduce that. Without it, ground truth is
+never read before evaluation.
+
 Outputs follow the main pipeline layout (``pair_XXX/smp_YYYY/sample{1,2}.png``
 plus ``details.json``/``alphas.json``), so ``scripts/select_candidates.py``
 and ``scripts/evaluate_artifact_tree.py`` apply unchanged.
@@ -129,6 +135,8 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--pair-start", type=int, default=0)
     parser.add_argument("--pair-end", type=int)
+    parser.add_argument("--order-by-ground-truth", action="store_true",
+                        help="Reorder outputs to the ground-truth sources (paper protocol)")
     args = parser.parse_args()
 
     upstream = import_upstream(args.doubledip_root.resolve())
@@ -151,6 +159,12 @@ def main() -> int:
             seed = args.seed + pair * args.num_samples + sample
             seed_everything(seed)
             image1, image2, alpha = separate(observation, mode, args, upstream)
+            if args.order_by_ground_truth:
+                def psnr(a, b):
+                    return 10 * np.log10(1.0 / max(np.mean((a - b) ** 2), 1e-12))
+                if (psnr(sources[0], image2) + psnr(sources[1], image1)
+                        > psnr(sources[0], image1) + psnr(sources[1], image2)):
+                    image1, image2, alpha = image2, image1, 1 - alpha
             out.mkdir(parents=True, exist_ok=True)
             np_to_pil(image1).save(out / "sample1.png")
             np_to_pil(image2).save(out / "sample2.png")
