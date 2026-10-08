@@ -39,3 +39,14 @@ paper statistically rather than pixel-for-pixel.
 Rerunning `scripts/generate_auto_prompts.py` with the pinned Qwen2-VL revision reproduced all 80
 raw VLM replies used for pairs 20-99 byte-for-byte; pairs 0-19 in
 `manifests/auto_prompts/` were regenerated the same way.
+
+## Baselines
+
+For every Table 1 cell of BIDeN, DAD, GIP and LCD, the evaluation command in
+`docs/BASELINES.md`, run from the stated checkpoint on the first three pairs, reproduces the
+stored paper outputs: BIDeN and DAD from a fresh upstream checkout with the patch applied (max
+difference one intensity level), GIP and LCD from `baselines/` (bit-identical). The stored
+outputs in turn reproduce the published Table 1 values. Each training entry point (BIDeN
+`alpha_train.py`, DAD `alpha_train.py`/`my_train.py`, GIP, LCD) completed a short run on an
+8-image subset of the training set. The three cross-split inconsistencies found this way are
+listed in `docs/BASELINES.md`.

@@ -1,0 +1,2135 @@
+diff --git a/alpha_test.py b/alpha_test.py
+new file mode 100644
+index 0000000..cc02a8d
+--- /dev/null
++++ b/alpha_test.py
+@@ -0,0 +1,324 @@
++"""
++Evaluation script for alpha-trained BID model.
++
++This script evaluates the BID model trained with alpha-based blending
++using the same dataset and output structure as my_test.py.
++"""
++
++import argparse
++import ast
++import json
++import os
++import sys
++from pathlib import Path
++from typing import Union, Dict, Any
++
++import matplotlib.pyplot as plt
++import pandas as pd
++import torch
++from PIL import Image
++from torch.utils.data import DataLoader
++
++
++from alphas.alpha_maps import get_alpha_map
++
++from data.base_dataset import BaseDataset, get_transform
++from models import create_model
++from options.test_options import TestOptions
++from utils.util import tensor2im, save_image
++
++
++def plot_map(map_tensor):
++    """Plot alpha map as grayscale image."""
++    fig, ax = plt.subplots(1)
++    img = map_tensor.detach().cpu().numpy()
++    img_plot = ax.imshow(img, vmin=0, vmax=1)
++    ax.set_title(f'Min: {img.min():.3f}, Max: {img.max():.3f}')
++    img_plot.set_cmap('gray')
++    return fig
++
++
++def save_json(file_path: Union[str, Path], data: Dict[str, Any]):
++    """Save dictionary as JSON file."""
++    with open(file_path, 'w') as fp:
++        json.dump(data, fp, indent=4, default=str)
++
++
++class AlphaEvalDataset(BaseDataset):
++    """Dataset for evaluating alpha-trained BID model.
++
++    Loads from CSV with columns:
++    - img1_path, img2_path: paths to images
++    - a, b, c, d, e, f: polynomial alpha coefficients
++    - img1_class, img2_class: class labels
++    - img1_prompt, img2_prompt: prompts (optional)
++    - z_seeds: random seeds used (optional)
++    """
++
++    def __init__(self, opt):
++        """Initialize dataset."""
++        BaseDataset.__init__(self, opt)
++        self.opt = opt
++        self.csv_root = Path(opt.dataroot)
++        self.root = self.csv_root.parent
++        self.data = pd.read_csv(self.csv_root)
++        self.switch_order = opt.switch_order
++        self.transform = get_transform(self.opt)
++
++        print(f"AlphaEvalDataset initialized:")
++        print(f"  CSV: {self.csv_root}")
++        print(f"  Root: {self.root}")
++        print(f"  Samples: {len(self.data)}")
++
++    def __getitem__(self, index: int) -> Dict[str, Union[torch.Tensor, str]]:
++        """Get a sample from the dataset."""
++        pair = self.data.iloc[index]
++        image1_path = self.root / pair['img1_path']
++        image2_path = self.root / pair['img2_path']
++
++        image1 = self.transform(Image.open(image1_path).convert('RGB'))
++        image2 = self.transform(Image.open(image2_path).convert('RGB'))
++        try:
++            alpha_gt = pair[['a', 'b', 'c', 'd', 'e', 'f']].values.tolist()
++        except:
++            alpha_gt = [0.5, 0, 0, 0, 0, 0]
++
++        return {
++            # Model expects 'A' and 'B'
++            'A': image1,
++            'B': image2,
++            # Keep original keys for metadata
++            'image1': image1,
++            'image1_path': str(image1_path),
++            'image1_class': pair['img1_class'],
++            'image1_prompt': pair.get('img1_prompt', ''),
++            'image2': image2,
++            'image2_path': str(image2_path),
++            'image2_class': pair['img2_class'],
++            'image2_prompt': pair.get('img2_prompt', ''),
++            'A_paths': str(image1_path),
++            'B_paths': str(image2_path),
++            'index': index,
++            'alpha_gt': alpha_gt,
++            'pair_seeds': ast.literal_eval(pair['z_seeds']) if 'z_seeds' in pair else [],
++            'pair_idx': index,
++        }
++
++    def __len__(self):
++        """Return dataset size."""
++        return len(self.data)
++
++
++class AlphaTestOptions(TestOptions):
++    """Extended test options for alpha evaluation."""
++
++    def initialize(self, parser):
++        parser = TestOptions.initialize(self, parser)
++
++        # Alpha-specific options
++        parser.add_argument('--alpha_mode', type=str, default='spatial',
++                            choices=['scalar', 'spatial'],
++                            help='Alpha mode used during training')
++        parser.add_argument('--alpha_min', type=float, default=0.2,
++                            help='Minimum alpha value')
++        parser.add_argument('--alpha_max', type=float, default=0.8,
++                            help='Maximum alpha value')
++
++        # Save arguments
++        parser.add_argument('--save_args', action='store_true', default=True,
++                            help='Save arguments to JSON file')
++
++        return parser
++
++    def gather_options(self):
++        """Override to skip dataset-specific options since we define dataset in script."""
++        if not self.initialized:
++            parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
++            parser = self.initialize(parser)
++
++        # Get basic options
++        if self.cmd_line is None:
++            opt, _ = parser.parse_known_args()
++        else:
++            opt, _ = parser.parse_known_args(self.cmd_line)
++
++        # Modify model-related parser options
++        from models import get_option_setter as get_model_option_setter
++        model_name = opt.model
++        model_option_setter = get_model_option_setter(model_name)
++        parser = model_option_setter(parser, self.isTrain)
++
++        if self.cmd_line is None:
++            opt, _ = parser.parse_known_args()
++        else:
++            opt, _ = parser.parse_known_args(self.cmd_line)
++
++        # Skip dataset-specific options - we define dataset in the script
++        self.parser = parser
++
++        if self.cmd_line is None:
++            return parser.parse_args()
++        else:
++            return parser.parse_args(self.cmd_line)
++
++
++def save_arguments(opt, save_dir):
++    """Save all arguments to JSON file."""
++    args_dict = vars(opt).copy()
++
++    # Convert non-serializable types
++    for key, value in args_dict.items():
++        if not isinstance(value, (str, int, float, bool, list, dict, type(None))):
++            args_dict[key] = str(value)
++
++    save_path = save_dir / 'arguments.json'
++    save_json(save_path, args_dict)
++    print(f"Arguments saved to: {save_path}")
++
++
++if __name__ == '__main__':
++    # Parse options
++    opt = AlphaTestOptions().parse()
++
++    opt.num_threads = 0
++    opt.serial_batches = True
++    opt.no_flip = True
++    opt.display_id = -1
++
++    print("\n" + "="*60)
++    print("Alpha-Based BID Model Evaluation")
++    print("="*60)
++    print(f"Dataset: {opt.dataroot}")
++    print(f"Model: {opt.model}")
++    print(f"Checkpoint: {opt.epoch}")
++    print(f"Results dir: {opt.results_dir}")
++    print(f"Alpha mode: {opt.alpha_mode}")
++    print(f"Alpha range: [{opt.alpha_min}, {opt.alpha_max}]")
++    print(f"Num test: {opt.num_test}")
++    print("="*60 + "\n")
++
++    # Create dataset and dataloader
++    dataset = AlphaEvalDataset(opt)
++    dataloader = DataLoader(
++        dataset=dataset,
++        batch_size=1,
++        shuffle=False,
++        num_workers=0,
++        pin_memory=True,
++        drop_last=False,
++    )
++
++    # Create model
++    model = create_model(opt)
++    save_dir = Path(opt.results_dir)
++    save_dir.mkdir(parents=True, exist_ok=True)
++
++    # Save arguments if requested
++    if opt.save_args:
++        save_arguments(opt, save_dir)
++
++    # Evaluation loop
++    for i, data in enumerate(dataloader):
++        pair_name = f"pair_{data['pair_idx'].item():03d}/smp_0000"
++        save_path = save_dir / pair_name
++        save_path.mkdir(parents=True, exist_ok=True)
++
++        # Create alpha map from ground truth coefficients
++        alpha = get_alpha_map(
++            name='param_2d_order',
++            init_alpha=data['alpha_gt'],
++            device='cuda' if torch.cuda.is_available() else 'cpu',
++            alpha_min=opt.alpha_min,
++            alpha_max=opt.alpha_max,
++            size=opt.crop_size,
++        )
++        data['alpha'] = alpha
++
++        # Initialize model on first iteration
++        if i == 0:
++            model.data_dependent_initialize(data)
++            model.setup(opt)
++            model.parallelize()
++            if opt.eval:
++                model.eval()
++
++        if i >= opt.num_test:
++            break
++
++        # Run inference
++        model.set_input(data)
++        model.test()
++        visuals = model.get_current_visuals()
++        img_path = model.get_image_paths()
++
++        if i % 50 == 0:
++            print(f'Processing ({i:04d})-th image... {img_path}')
++
++        # Map BID visual names to expected output names
++        # BID model returns: fake_A, fake_B, real_A, real_B, real_input
++        # We need: sample1, sample2, blended_gt, blended_sample
++
++        # Save images with correct naming
++        save_image(tensor2im(visuals['fake_A']), save_path / 'sample1.png', aspect_ratio=1.0)
++        save_image(tensor2im(visuals['fake_B']), save_path / 'sample2.png', aspect_ratio=1.0)
++        save_image(tensor2im(visuals['real_input']), save_path / 'blended_gt.png', aspect_ratio=1.0)
++
++        # Reconstruct blended image from predictions
++        # Get alpha map and reconstruct: blended = alpha * fake_A + (1-alpha) * fake_B
++        alpha_2d = alpha.forward()  # [H, W]
++        alpha_3ch = alpha_2d.unsqueeze(0).unsqueeze(0).expand(1, 3, -1, -1)  # [1, 3, H, W]
++        alpha_3ch = alpha_3ch.to(visuals['fake_A'].device)
++
++        # Convert from [-1, 1] to [0, 1] for blending, then back
++        fake_A_01 = (visuals['fake_A'] + 1) / 2.0
++        fake_B_01 = (visuals['fake_B'] + 1) / 2.0
++        blended_sample_01 = alpha_3ch * fake_A_01 + (1 - alpha_3ch) * fake_B_01
++        blended_sample = blended_sample_01 * 2.0 - 1.0
++
++        save_image(tensor2im(blended_sample), save_path / 'blended_sample.png', aspect_ratio=1.0)
++
++        # Save details JSON
++        save_json(
++            save_path / 'details.json',
++            {
++                "image1_path": data['image1_path'][0] if isinstance(data['image1_path'], list) else data['image1_path'],
++                "image1_class": data['image1_class'][0] if isinstance(data['image1_class'], list) else data['image1_class'],
++                "image1_prompt": data['image1_prompt'][0] if isinstance(data['image1_prompt'], list) else data['image1_prompt'],
++                "image2_path": data['image2_path'][0] if isinstance(data['image2_path'], list) else data['image2_path'],
++                "image2_class": data['image2_class'][0] if isinstance(data['image2_class'], list) else data['image2_class'],
++                "image2_prompt": data['image2_prompt'][0] if isinstance(data['image2_prompt'], list) else data['image2_prompt'],
++                "sample1_path": str(save_path / 'sample1.png'),
++                "sample2_path": str(save_path / 'sample2.png'),
++                "sample_time": 0.0,
++                "smp_seed": None,
++                "pair_idx": data['pair_idx'].item(),
++            }
++        )
++
++        # Save alpha information
++        alpha_temp = {
++            "type": "param_2d_order",
++            "parameters": [t.item() for t in alpha.get_scaled_parameters()],
++            "raw_parameters": [t.item() for t in alpha.get_parameters()],
++            "init_parameters": [t.item() for t in alpha.init_alpha],
++        }
++
++        save_json(
++            save_path / 'alphas.json',
++            {
++                "pred": alpha_temp,
++                "gt": alpha_temp,
++                "init_pred_map": alpha_temp
++            }
++        )
++
++        # Save alpha map visualization
++        alpha_fig = plot_map(alpha.forward())
++        alpha_fig.savefig(save_path / 'pred_map.png')
++        alpha_fig.savefig(save_path / 'gt_map.png')
++        plt.close(alpha_fig)
++
++    print("\n" + "="*60)
++    print("Evaluation completed!")
++    print(f"Results saved to: {save_dir}")
++    print("="*60)
+diff --git a/alpha_train.py b/alpha_train.py
+new file mode 100644
+index 0000000..e13f07f
+--- /dev/null
++++ b/alpha_train.py
+@@ -0,0 +1,253 @@
++"""
++Training script for BID with alpha-based blending.
++
++This script trains the BID model on alpha-blended images with random
++scalar or spatially-varying alpha values.
++"""
++
++import time
++import torch
++from options.train_options import TrainOptions
++from data import create_dataset
++from models import create_model
++from utils.visualizer import Visualizer
++from pathlib import Path
++import os
++
++
++class AlphaTrainOptions(TrainOptions):
++    """Extended training options with output_dir support."""
++
++    def initialize(self, parser):
++        parser = TrainOptions.initialize(self, parser)
++
++        # Override checkpoints_dir with output_dir structure
++        parser.add_argument('--output_dir', type=str, default='./outputs_alpha_bid',
++                            help='Root directory for all outputs (creates checkpoints/ subdirectory)')
++
++        return parser
++
++    def parse(self):
++        """Parse options and setup output directory structure."""
++        opt = self.gather_options()
++        opt.isTrain = self.isTrain
++
++        # Create output directory structure
++        if hasattr(opt, 'output_dir'):
++            output_path = Path(opt.output_dir)
++            opt.checkpoints_dir = str(output_path / 'checkpoints')
++            os.makedirs(opt.checkpoints_dir, exist_ok=True)
++
++        # Process opt.suffix
++        if opt.suffix:
++            suffix = ('_' + opt.suffix.format(**vars(opt))) if opt.suffix != '' else ''
++            opt.name = opt.name + suffix
++
++        self.print_options(opt)
++
++        # Set gpu ids
++        str_ids = opt.gpu_ids.split(',')
++        opt.gpu_ids = []
++        for str_id in str_ids:
++            id = int(str_id)
++            if id >= 0:
++                opt.gpu_ids.append(id)
++        if len(opt.gpu_ids) > 0:
++            torch.cuda.set_device(opt.gpu_ids[0])
++
++        self.opt = opt
++        return self.opt
++
++
++if __name__ == '__main__':
++    # Parse options
++    opt = AlphaTrainOptions().parse()
++
++    print("\n" + "="*60)
++    print("Alpha-Based Blending Training for BID")
++    print("="*60)
++    print(f"Dataset: {opt.dataroot}")
++    print(f"Dataset mode: {opt.dataset_mode}")
++    print(f"Alpha mode: {opt.alpha_mode}")
++    print(f"Alpha range: [{opt.alpha_min}, {opt.alpha_max}]")
++    print(f"Model: {opt.model}")
++    print(f"Output dir: {opt.output_dir if hasattr(opt, 'output_dir') else opt.checkpoints_dir}")
++    print(f"Experiment name: {opt.name}")
++    print("="*60 + "\n")
++
++    # Validation checks
++    if opt.dataset_mode != 'alpha_blend':
++        print("WARNING: dataset_mode should be 'alpha_blend' for alpha training!")
++        print(f"Current dataset_mode: {opt.dataset_mode}")
++        print("Continue anyway? (model may not work correctly)")
++
++    if opt.model not in ['alphabiden', 'biden2', 'biden']:
++        print(f"WARNING: Using model '{opt.model}' - recommended model is 'alphabiden'")
++        print("Continue anyway?")
++
++    # Create dataset and split into train/val
++    full_dataset = create_dataset(opt)
++    dataset_size = len(full_dataset)
++
++    # Split into train and validation (90/10 split)
++    from torch.utils.data import random_split, DataLoader
++    val_size = int(0.1 * dataset_size)
++    train_size = dataset_size - val_size
++
++    train_dataset, val_dataset = random_split(
++        full_dataset.dataset,  # Access underlying dataset from CustomDatasetDataLoader
++        [train_size, val_size],
++        generator=torch.Generator().manual_seed(42)  # Fixed seed for reproducibility
++    )
++
++    # Create dataloaders
++    dataloaders = {
++        'train': DataLoader(
++            train_dataset,
++            batch_size=opt.batch_size,
++            shuffle=True,
++            num_workers=int(opt.num_threads),
++            drop_last=True
++        ),
++        'val': DataLoader(
++            val_dataset,
++            batch_size=opt.batch_size,
++            shuffle=False,
++            num_workers=int(opt.num_threads),
++            drop_last=False
++        ),
++    }
++
++    print(f"Dataset split:")
++    print(f"  Total: {dataset_size} samples")
++    print(f"  Train: {train_size} samples ({100*train_size/dataset_size:.1f}%)")
++    print(f"  Val: {val_size} samples ({100*val_size/dataset_size:.1f}%)")
++    print()
++
++    # Create model
++    model = create_model(opt)
++    print(f'The number of training images = {train_size}')
++
++    # Create visualizer
++    visualizer = Visualizer(opt)
++    opt.visualizer = visualizer
++    total_iters = 0
++
++    optimize_time = 0.1
++    times = []
++
++    # Best checkpoint tracking
++    best_val_loss = float('inf')
++    best_epoch = 0
++
++    # Training loop
++    for epoch in range(opt.epoch_count, opt.n_epochs + opt.n_epochs_decay + 1):
++        epoch_start_time = time.time()
++        iter_data_time = time.time()
++        epoch_iter = 0
++        visualizer.reset()
++
++        # Set epoch for dataset if it has this method
++        if hasattr(dataloaders['train'].dataset, 'dataset'):
++            if hasattr(dataloaders['train'].dataset.dataset, 'set_epoch'):
++                dataloaders['train'].dataset.dataset.set_epoch(epoch)
++
++        for i, data in enumerate(dataloaders['train']):
++            iter_start_time = time.time()
++            if total_iters % opt.print_freq == 0:
++                t_data = iter_start_time - iter_data_time
++
++            batch_size = data["A"].size(0)
++            total_iters += batch_size
++            epoch_iter += batch_size
++
++            if len(opt.gpu_ids) > 0:
++                torch.cuda.synchronize()
++
++            optimize_start_time = time.time()
++
++            # Initialize model on first iteration
++            if epoch == opt.epoch_count and i == 0:
++                model.data_dependent_initialize(data)
++                model.setup(opt)
++                model.parallelize()
++
++            # Training step
++            model.set_input(data)
++            model.optimize_parameters()
++
++            if len(opt.gpu_ids) > 0:
++                torch.cuda.synchronize()
++
++            optimize_time = (time.time() - optimize_start_time) / batch_size * 0.005 + 0.995 * optimize_time
++
++            # Display images
++            if total_iters % opt.display_freq == 0:
++                save_result = total_iters % opt.update_html_freq == 0
++                model.compute_visuals()
++                visualizer.display_current_results(model.get_current_visuals(), epoch, save_result)
++
++            # Print losses
++            if total_iters % opt.print_freq == 0:
++                losses = model.get_current_losses()
++                visualizer.print_current_losses(epoch, epoch_iter, losses, optimize_time, t_data)
++                if opt.display_id is None or opt.display_id > 0:
++                    visualizer.plot_current_losses(epoch, float(epoch_iter) / train_size, losses)
++
++            # Save latest model
++            if total_iters % opt.save_latest_freq == 0:
++                print(f'Saving the latest model (epoch {epoch}, total_iters {total_iters})')
++                print(opt.name)
++                save_suffix = 'iter_%d' % total_iters if opt.save_by_iter else 'latest'
++                model.save_networks(save_suffix)
++
++            iter_data_time = time.time()
++
++        # Save model at epoch end
++        if epoch % opt.save_epoch_freq == 0:
++            print(f'Saving the model at the end of epoch {epoch}, iters {total_iters}')
++            model.save_networks('latest')
++            model.save_networks(epoch)
++
++        # Validation and best checkpoint saving
++        print('Running validation...')
++        model.eval()
++        val_losses = []
++
++        for val_i, val_data in enumerate(dataloaders['val']):
++            if val_i >= 100:  # Limit validation to 100 samples for speed
++                break
++
++            model.set_input(val_data)
++            with torch.no_grad():
++                model.forward()
++                # Compute reconstruction loss
++                val_loss = torch.nn.functional.l1_loss(model.fake_A, model.real_A) + \
++                          torch.nn.functional.l1_loss(model.fake_B, model.real_B)
++                val_losses.append(val_loss.item())
++
++        model.train()
++
++        avg_val_loss = sum(val_losses) / len(val_losses) if val_losses else float('inf')
++        print(f'Validation loss: {avg_val_loss:.6f}')
++
++        # Save best checkpoint if validation loss improved
++        if avg_val_loss < best_val_loss:
++            print(f'*** New best validation loss: {avg_val_loss:.6f} (previous: {best_val_loss:.6f}) ***')
++            best_val_loss = avg_val_loss
++            best_epoch = epoch
++            model.save_networks('best')
++            print(f'Best model saved at epoch {epoch}')
++
++        print(f'End of epoch {epoch} / {opt.n_epochs + opt.n_epochs_decay} \t '
++              f'Time Taken: {time.time() - epoch_start_time:.0f} sec')
++
++        # Update learning rates
++        model.update_learning_rate()
++
++    print("\n" + "="*60)
++    print("Training completed!")
++    print(f"Models saved to: {opt.checkpoints_dir}/{opt.name}/")
++    print(f"Best validation loss: {best_val_loss:.6f} at epoch {best_epoch}")
++    print(f"Best checkpoint: best_net_*.pth")
++    print("="*60)
+diff --git a/alphas/alpha_maps/__init__.py b/alphas/alpha_maps/__init__.py
+new file mode 100644
+index 0000000..c536962
+--- /dev/null
++++ b/alphas/alpha_maps/__init__.py
+@@ -0,0 +1,3 @@
++from .base import *
++from .params import *
++from .registry import  *
+diff --git a/alphas/alpha_maps/base.py b/alphas/alpha_maps/base.py
+new file mode 100644
+index 0000000..58e98fc
+--- /dev/null
++++ b/alphas/alpha_maps/base.py
+@@ -0,0 +1,116 @@
++from abc import ABC, abstractmethod
++from typing import (Optional,
++                    Union,
++                    List,
++                    )
++import torch
++import torch.nn.functional as F
++
++
++class AlphaMap(ABC):
++    """Base class for all alpha maps."""
++
++    def __init__(self,
++                 map_type: str,
++                 size: int = 512,
++                 device: "Device"  = 'cuda',
++                 alpha_min: float = 0.0,
++                 alpha_max: float = 1.0,
++                 init_alpha: Optional[Union[List[float], float]] = None,
++                 requires_grad: bool = False,
++                 ):
++        self.map_type = map_type
++        self.size = (size, size)
++        self.device = device
++        self.alpha_min = alpha_min
++        self.alpha_max = alpha_max
++        self.min_slope = alpha_max - alpha_min
++        self.init_alpha = init_alpha
++        self.requires_grad = requires_grad
++        self.init_params = None
++        self.initialized = False
++        self._initialize_parameters()
++
++    def tanh(self, img):
++        return 0.5 * F.tanh(img) + 0.5
++
++    @abstractmethod
++    def _initialize_parameters(self):
++        """Initialize map-specific parameters."""
++        pass
++
++    @abstractmethod
++    def forward(self):
++        """Generate the alpha map from current parameters."""
++        pass
++
++    @abstractmethod
++    def get_parameters(self):
++        """Return list of parameters that can be optimized."""
++        pass
++
++    def get_smoothness_loss(self, weight=1e-3):
++        """
++        Default smoothness loss for non-spatial alpha maps.
++        Returns zero loss to maintain compatibility.
++
++        Args:
++            weight: Regularization weight (ignored for non-spatial maps)
++
++        Returns:
++            Zero tensor for compatibility
++        """
++        # Return zero loss for polynomial-based alpha maps
++        # Only spatial maps will override this with actual smoothness computation
++        return torch.tensor(0.0, device=self.device, requires_grad=False)
++
++    def __call__(self):
++        """Allow using instance as a callable."""
++        return self.forward()
++
++    def sum(self):
++        return self.forward().sum()
++
++    def mean(self):
++        return self.forward().mean()
++
++    # Basic arithmetic operations
++    def __add__(self, other): return self.forward() + other
++
++    def __radd__(self, other): return other + self.forward()
++
++    def __sub__(self, other): return self.forward() - other
++
++    def __rsub__(self, other): return other - self.forward()
++
++    def __mul__(self, other): return self.forward() * other
++
++    def __rmul__(self, other): return other * self.forward()
++
++    def __truediv__(self, other): return self.forward() / other
++
++    def __rtruediv__(self, other): return other / self.forward()
++
++    # Comparison operations
++    def __lt__(self, other): return self.forward() < other
++
++    def __le__(self, other): return self.forward() <= other
++
++    def __gt__(self, other): return self.forward() > other
++
++    def __ge__(self, other): return self.forward() >= other
++
++    def __eq__(self, other): return self.forward() == other
++
++    def __ne__(self, other): return self.forward() != other
++
++    # Power operations
++    def __pow__(self, other): return self.forward() ** other
++
++    def __rpow__(self, other): return other ** self.forward()
++
++    # Absolute value
++    def __abs__(self): return abs(self.forward())
++
++    # Negation
++    def __neg__(self): return -self.forward()
+diff --git a/alphas/alpha_maps/params.py b/alphas/alpha_maps/params.py
+new file mode 100644
+index 0000000..917eba2
+--- /dev/null
++++ b/alphas/alpha_maps/params.py
+@@ -0,0 +1,415 @@
++import math
++import random
++
++import torch
++
++from .base import AlphaMap
++from .registry import register_alpha_map
++
++
++@register_alpha_map('param_scalar')
++class ParamScalarMap(AlphaMap):
++    def _initialize_parameters(self):
++        if self.init_alpha is None:
++            a = math.atanh(2 * torch.tensor(random.uniform(self.alpha_min,
++                                                           self.alpha_max) -
++                                            0.5))
++        else:
++            if isinstance(self.init_alpha, list):
++                init_alpha = self.init_alpha[0]
++            else:
++                init_alpha = self.init_alpha
++
++            a = math.atanh(2 * ((init_alpha + 1e-9 - self.alpha_min) /
++                                self.min_slope - 0.5))
++
++        self.a = torch.tensor(a, device=self.device).requires_grad_(self.requires_grad)
++        self.pixels = self.forward()
++        self.init_params = [param.clone().detach()
++                            for param in self.get_scaled_parameters()]
++
++    def get_parameters(self):
++        return [self.a]
++
++    def get_scaled_parameters(self):
++        self.calc_tanh()
++        return [self.tanh_a]
++
++    def calc_tanh(self):
++        self.tanh_a = (self.alpha_max - self.alpha_min) * self.tanh(
++            self.a) + self.alpha_min
++
++    def forward(self):
++        self.calc_tanh()
++        self.pixels = torch.ones(size=self.size,
++                                 device=self.device) * self.tanh_a
++        return self.pixels
++
++    def get_scale_functions(self):
++        return [
++            lambda a: math.atanh(2 * (a - 0.5))
++        ]
++
++    def __str__(self):
++        a = self.get_scaled_parameters()[0]
++        return f'\u03B1(X,Y) = {a:.04}'
++
++
++@register_alpha_map('param_x_gradient')
++class ParamXGradientMap(AlphaMap):
++    def _initialize_parameters(self):
++        if self.init_alpha is None:
++            a_t = random.uniform(self.alpha_min, self.alpha_max)
++            b_t = random.uniform(self.alpha_min - a_t, self.alpha_max - a_t)
++
++        else:
++            a_t, b_t = self.init_alpha
++
++        a = math.atanh(
++            2 * ((a_t + 1e-9 - self.alpha_min) / self.min_slope - 0.5))
++        b = math.atanh(
++            2 * ((b_t + a_t - 1e-9 - self.alpha_min) / self.min_slope - 0.5))
++        self.a = torch.tensor(a, device=self.device).requires_grad_(self.requires_grad)
++        self.b = torch.tensor(b, device=self.device).requires_grad_(self.requires_grad)
++        img_range = torch.arange(self.size[1], device=self.device)
++        self.Y, self.X = torch.meshgrid(img_range, img_range, indexing='ij')
++        self.pixels = self.forward()
++        self.init_params = [param.clone().detach() for param in
++                            self.get_scaled_parameters()]
++
++    def get_parameters(self):
++        return [self.a, self.b]
++
++    def get_scaled_parameters(self):
++        self.calc_tanh()
++        return [self.tanh_a, self.tanh_b]
++
++    def calc_tanh(self):
++        self.tanh_a = self.min_slope * self.tanh(self.a) + self.alpha_min
++        self.tanh_b = (
++                              self.alpha_min - self.tanh_a) + self.min_slope\
++                      * self.tanh(
++            self.b)
++
++    def get_scale_functions(self):
++        return [
++            lambda a, b: math.atanh(2 * (a - 0.5)),
++            lambda a, b: math.atanh(
++                2 * ((a + b - 1e-9 - self.alpha_min) / self.min_slope - 0.5)),
++        ]
++
++    def forward(self):
++        self.calc_tanh()
++        self.pixels = self.tanh_a + (self.tanh_b * self.X) / self.size[1]
++        return self.pixels
++
++    def __str__(self):
++        a, b = self.get_scaled_parameters()
++        return f'\u03B1(X,Y) = {a:.04} + {b:.04}X'
++
++
++@register_alpha_map('param_2d_gradient')
++class Param2DGradientMap(AlphaMap):
++    def _initialize_parameters(self):
++
++        if self.init_alpha is None:
++            a_t = random.uniform(self.alpha_min, self.alpha_max)
++            b_t = random.uniform(self.alpha_min - a_t, self.alpha_max - a_t)
++            if b_t >= 0:
++                c_t = random.uniform(self.alpha_min - a_t,
++                                     self.alpha_max - a_t - b_t)
++            else:
++                c_t = random.uniform(self.alpha_min - a_t - b_t,
++                                     self.alpha_max - a_t)
++
++        else:
++            a_t, b_t, c_t = self.init_alpha
++
++        a = math.atanh(2 * ((a_t - self.alpha_min) / self.min_slope - 0.5))
++        b = math.atanh(
++            2 * ((b_t - (self.alpha_min - a_t)) / self.min_slope - 0.5))
++        if b_t >= 0:
++            c = math.atanh(2 * ((c_t - (self.alpha_min - a_t)) / (
++                    self.min_slope + b_t) - 0.5))
++        else:
++            c = math.atanh(2 * ((c_t - (self.alpha_min - a_t - b_t)) / (
++                    self.min_slope - b_t) - 0.5))
++
++        self.a = torch.tensor(a, device=self.device).requires_grad_(self.requires_grad)
++        self.b = torch.tensor(b, device=self.device).requires_grad_(self.requires_grad)
++        self.c = torch.tensor(c, device=self.device).requires_grad_(self.requires_grad)
++
++        img_range = torch.arange(self.size[1], device=self.device)
++        self.Y, self.X = torch.meshgrid(img_range, img_range, indexing='ij')
++        self.pixels = self.forward()
++        self.init_params = [param.clone().detach() for param in
++                            self.get_scaled_parameters()]
++
++    def get_parameters(self):
++        return [self.a, self.b, self.c]
++
++    def get_scaled_parameters(self):
++        self.calc_tanh()
++        return [self.tanh_a, self.tanh_b, self.tanh_c]
++
++    def calc_tanh(self):
++        self.tanh_a = self.min_slope * self.tanh(self.a) + self.alpha_min
++        self.tanh_b = (
++                              self.alpha_min - self.tanh_a) + self.min_slope\
++                      * self.tanh(
++            self.b)
++        if self.tanh_b >= 0:
++            self.tanh_c = (self.alpha_min - self.tanh_a) + (
++                    self.min_slope + self.tanh_b) * self.tanh(self.c)
++        else:
++            self.tanh_c = (self.alpha_min - self.tanh_a - self.tanh_b) + (
++                    self.min_slope - self.tanh_b) * self.tanh(self.c)
++
++    def forward(self):
++        self.calc_tanh()
++        self.pixels = (
++                self.tanh_a + (self.tanh_b * self.X) / (self.size[1] - 1) + (
++                    self.tanh_c * self.Y) / (self.size[0] - 1))
++        return self.pixels
++
++    def get_scale_functions(self):
++        return [lambda a, b, c: math.atanh(2 * (a - 0.5)),
++                lambda a, b, c: math.atanh(
++                    2 * ((a + b - self.alpha_min) / self.min_slope - 0.5)),
++                lambda a, b, c: math.atanh(2 * ((c - (self.alpha_min - a)) / (
++                        self.min_slope + b) - 0.5)) if b >= 0 else math.atanh(
++                    2 * ((c - (self.alpha_min - a - b)) / (
++                            self.min_slope - b) - 0.5))]
++
++    def __str__(self):
++        a, b, c = self.get_scaled_parameters()
++        return f'\u03B1(X,Y) = {a:.04} + {b:.04}X + {c:.04}Y'
++
++
++@register_alpha_map('param_2d_order')
++class ParamSecondOrderMap(AlphaMap):
++    def _initialize_parameters(self):
++        if self.init_alpha:
++            a_t, b_t, c_t, d_t, e_t, f_t = self.init_alpha
++
++        else:
++            a_t = random.uniform(self.alpha_min, self.alpha_max)
++            b_t = random.uniform(self.alpha_min - a_t, self.alpha_max - a_t)
++            e_t = random.uniform(self.alpha_min - (a_t + b_t),
++                                 self.alpha_max - (a_t + b_t))
++            c_t = random.uniform(self.alpha_min - a_t, self.alpha_max - a_t)
++            f_t = random.uniform(self.alpha_min - (a_t + c_t),
++                                 self.alpha_max - (a_t + c_t))
++            d_t = random.uniform(
++                self.alpha_min - (a_t + b_t + c_t + e_t + f_t),
++                self.alpha_max - (a_t + b_t + c_t + e_t + f_t))
++
++        a = math.atanh(2 * ((a_t - self.alpha_min) / self.min_slope - 0.5))
++        b = math.atanh(2 * ((b_t - (self.alpha_min - a_t)) / self.min_slope - 0.5))
++        e = math.atanh(2 * ((e_t  + a_t + b_t - self.alpha_min)  / self.min_slope - 0.5))
++        c = math.atanh(2 * ((c_t - (self.alpha_min - a_t)) / self.min_slope - 0.5))
++        f = math.atanh(2 * (((f_t + (a_t + c_t)) - self.alpha_min) / self.min_slope - 0.5))
++        d = math.atanh(2 * (((d_t + (a_t + b_t + c_t + e_t + f_t)) - self.alpha_min) / self.min_slope - 0.5))
++
++        self.a = torch.tensor(a, device=self.device).requires_grad_(self.requires_grad)
++        self.b = torch.tensor(b, device=self.device).requires_grad_(self.requires_grad)
++        self.c = torch.tensor(c, device=self.device).requires_grad_(self.requires_grad)
++        self.d = torch.tensor(d, device=self.device).requires_grad_(self.requires_grad)
++        self.e = torch.tensor(e, device=self.device).requires_grad_(self.requires_grad)
++        self.f = torch.tensor(f, device=self.device).requires_grad_(self.requires_grad)
++
++        # Create coordinate grid for evaluation
++        img_range_x = torch.arange(self.size[1], device=self.device)
++        img_range_y = torch.arange(self.size[0], device=self.device)
++        self.Y, self.X = torch.meshgrid(img_range_y, img_range_x,
++                                        indexing='ij')
++        self.pixels = self.forward()
++        self.init_params = [p.clone().detach() for p in
++                            self.get_scaled_parameters()]
++
++    def get_parameters(self):
++        return [self.a, self.b, self.c, self.d, self.e, self.f]
++
++    def get_scaled_parameters(self):
++        self.calc_tanh()
++        return [self.tanh_a, self.tanh_b, self.tanh_c, self.tanh_d,
++                self.tanh_e, self.tanh_f]
++
++    def calc_tanh(self):
++
++        self.tanh_a = self.min_slope * self.tanh(self.a) + self.alpha_min
++        self.tanh_b = (self.alpha_min - self.tanh_a) + self.min_slope * self.tanh(self.b)
++        self.tanh_e = (self.alpha_min - (self.tanh_a + self.tanh_b)) + self.min_slope * self.tanh(self.e)
++        self.tanh_c = (self.alpha_min - self.tanh_a) + self.min_slope * self.tanh(self.c)
++        self.tanh_f = (self.alpha_min - (self.tanh_a + self.tanh_c)) + self.min_slope * self.tanh(self.f)
++        total_base = self.tanh_a + self.tanh_b + self.tanh_c + self.tanh_e + self.tanh_f
++        self.tanh_d = (self.alpha_min - total_base) + self.min_slope * self.tanh(self.d)
++
++    def forward(self):
++        self.calc_tanh()
++        # Normalize coordinates to [0, 1]
++        X_norm = self.X / (self.size[1] - 1)
++        Y_norm = self.Y / (self.size[0] - 1)
++        self.pixels = (
++                self.tanh_a + self.tanh_b * X_norm + self.tanh_c * Y_norm + self.tanh_d * X_norm * Y_norm + self.tanh_e * (
++                X_norm**2) + self.tanh_f * (Y_norm**2))
++        return self.pixels
++
++    def __str__(self):
++        a, b, c, d, e, f = self.get_scaled_parameters()
++        return f'α(X,Y) = {a:.02} + {b:.02}X + {c:.02}Y + {d:.02}XY + {e:.02}X² + {f:.02}Y²'
++
++
++@register_alpha_map('param_spatial_full')
++class ParamSpatialFullMap(AlphaMap):
++    """
++    Full spatial resolution alpha map with HxW parameters.
++    Initialized using the same logic as ParamSecondOrderMap but optimizes every pixel independently.
++    """
++
++    def _initialize_parameters(self):
++        if self.init_alpha is None:
++            # Random initialization using polynomial
++            self._initialize_from_polynomial()
++        elif isinstance(self.init_alpha, list):
++            if len(self.init_alpha) == 6:
++                # List of 6 polynomial coefficients - initialize from polynomial
++                self._initialize_from_polynomial()
++            else:
++                # Assume it's a spatial map (nested list HxW)
++                self._initialize_from_spatial_map()
++        else:
++            raise ValueError(f"Unsupported init_alpha format: {type(self.init_alpha)}")
++
++        # Store initial state and compute initial pixels
++        self.pixels = self.forward()
++        self.init_params = [self.alpha_params.clone().detach()]
++
++    def _initialize_from_polynomial(self):
++        """Initialize from 6 polynomial coefficients using ParamSecondOrderMap."""
++        # Store original init_alpha for saving
++        self._original_init_alpha = self.init_alpha
++
++        # Create temporary 2nd-order map with same initialization parameters
++        temp_poly_map = ParamSecondOrderMap(
++            map_type='param_2d_order',
++            size=self.size[0],  # assuming square
++            device=self.device,
++            alpha_min=self.alpha_min,
++            alpha_max=self.alpha_max,
++            init_alpha=self.init_alpha,
++            requires_grad=False  # we don't need gradients for initialization
++        )
++
++        # Get the evaluated polynomial as our starting alpha map
++        initial_alpha_map = temp_poly_map.forward()  # Shape: (H, W)
++
++        # Convert to unconstrained parameters
++        self._convert_alpha_map_to_params(initial_alpha_map)
++
++    def _initialize_from_spatial_map(self):
++        """Initialize from loaded spatial alpha map (constrained values)."""
++        # Convert nested list to tensor
++        if isinstance(self.init_alpha[0], list):
++            # Nested list [[row1], [row2], ...]
++            alpha_map = torch.tensor(self.init_alpha, device=self.device, dtype=torch.float32)
++        else:
++            # Flattened list - reshape to spatial dimensions
++            alpha_map = torch.tensor(self.init_alpha, device=self.device, dtype=torch.float32)
++            alpha_map = alpha_map.reshape(self.size)
++
++        # Convert to unconstrained parameters
++        self._convert_alpha_map_to_params(alpha_map)
++
++    def _convert_alpha_map_to_params(self, alpha_map):
++        """Convert constrained alpha map to unconstrained parameters."""
++        # Reverse the tanh transformation: alpha -> unconstrained
++        # alpha = alpha_min + min_slope * (0.5 * tanh(x) + 0.5)
++        # Solving for x: x = atanh(2 * ((alpha - alpha_min) / min_slope) - 1)
++        normalized_alpha = (alpha_map - self.alpha_min) / self.min_slope  # [0, 1]
++        tanh_input = 2 * normalized_alpha - 1  # [-1, 1]
++        # Clamp to avoid numerical issues with atanh
++        tanh_input = torch.clamp(tanh_input, -0.999, 0.999)
++        unconstrained_init = torch.atanh(tanh_input)
++
++        # Create the learnable HxW parameter tensor
++        self.alpha_params = torch.tensor(unconstrained_init, device=self.device).requires_grad_(self.requires_grad)
++
++    def get_parameters(self):
++        """Return the full spatial parameter tensor."""
++        return [self.alpha_params]
++
++    def get_scaled_parameters(self):
++        """Return the constrained alpha values."""
++        self.calc_tanh()
++        return [self.tanh_alpha]
++
++    def calc_tanh(self):
++        """Convert unconstrained parameters to valid alpha values [alpha_min, alpha_max]."""
++        # Follow the same pattern as other alpha maps
++        self.tanh_alpha = self.min_slope * self.tanh(self.alpha_params) + self.alpha_min
++
++    def forward(self):
++        """Generate the alpha map from current parameters."""
++        self.calc_tanh()
++        self.pixels = self.tanh_alpha
++        return self.pixels
++
++    def get_scale_functions(self):
++        """Return functions to convert from constrained to unconstrained space."""
++
++        # For compatibility - though less meaningful for spatial maps
++        def inverse_transform(alpha_tensor):
++            normalized = (alpha_tensor - self.alpha_min) / self.min_slope
++            tanh_input = torch.clamp(2 * normalized - 1, -0.999, 0.999)
++            return torch.atanh(tanh_input)
++
++        return [inverse_transform]
++
++    def get_save_parameters(self):
++        """Get parameters in format compatible with JSON saving."""
++        # Return the constrained alpha map as nested list for JSON
++        alpha_map = self.forward()  # Get constrained values
++        return alpha_map.detach().cpu().tolist()  # Convert to nested list
++
++    def get_save_raw_parameters(self):
++        """Get raw (unconstrained) parameters for JSON saving."""
++        return self.alpha_params.detach().cpu().tolist()
++
++    def get_save_init_parameters(self):
++        """Get initial parameters for JSON saving."""
++        if hasattr(self, '_original_init_alpha') and self._original_init_alpha is not None:
++            return self._original_init_alpha
++        else:
++            # If initialized from spatial map, return the initial map
++            return self.init_params[0].detach().cpu().tolist()
++
++    def get_smoothness_loss(self, weight=100000.0):
++        """
++        Compute Laplacian smoothness regularization loss on the alpha map.
++        This penalizes second derivatives and encourages polynomial-like behavior.
++
++        Args:
++            weight: Regularization weight (default: 1e-1)
++
++        Returns:
++            Smoothness loss tensor
++        """
++        alpha_map = self.forward()  # Get constrained alpha map
++
++        # Compute discrete Laplacian: ∇²α = α[i+1,j] + α[i-1,j] + α[i,j+1] + α[i,j-1] - 4α[i,j]
++        padded = torch.nn.functional.pad(alpha_map, (1, 1, 1, 1), mode='constant', value=0)
++
++        laplacian = (padded[2:, 1:-1] +  # α[i+1,j]
++                     padded[:-2, 1:-1] +  # α[i-1,j]
++                     padded[1:-1, 2:] +  # α[i,j+1]
++                     padded[1:-1, :-2] -  # α[i,j-1]
++                     4 * alpha_map)  # -4α[i,j]
++
++        return weight * laplacian.pow(2).mean()
++
++    def __str__(self):
++        """String representation showing the spatial dimensions."""
++        num_params = self.alpha_params.numel()
++        memory_mb = num_params * 4 / (1024 * 1024)  # 4 bytes per float32
++        return f'α(X,Y) = Spatial[{self.size[0]}×{self.size[1]}]'
+\ No newline at end of file
+diff --git a/alphas/alpha_maps/registry.py b/alphas/alpha_maps/registry.py
+new file mode 100644
+index 0000000..c989b90
+--- /dev/null
++++ b/alphas/alpha_maps/registry.py
+@@ -0,0 +1,19 @@
++__ALPHA_MAPS__ = {}
++
++def register_alpha_map(name: str):
++    def wrapper(cls):
++        if __ALPHA_MAPS__.get(name, None):
++            raise NameError(f"Name { name} is already registered!")
++        __ALPHA_MAPS__[name] = cls
++        return cls
++    return wrapper
++
++
++def get_alpha_map(name: str, **kwargs):
++    if __ALPHA_MAPS__.get(name, None) is None:
++        raise NameError(f"Name {name} is not defined!")
++    return __ALPHA_MAPS__[name](map_type=name, **kwargs)
++
++
++def get_alpha_map_types():
++    return list(__ALPHA_MAPS__.keys())
+\ No newline at end of file
+diff --git a/data/alpha_blend_dataset.py b/data/alpha_blend_dataset.py
+new file mode 100644
+index 0000000..d35385f
+--- /dev/null
++++ b/data/alpha_blend_dataset.py
+@@ -0,0 +1,197 @@
++"""Alpha-based blending dataset for BID training.
++
++This dataset loads image pairs from trainA and trainB folders,
++generates random alpha values (scalar or spatially-varying),
++and creates blended images for training.
++"""
++
++import os.path
++import sys
++from data.base_dataset import BaseDataset, get_transform, get_params
++from data.image_folder import make_dataset
++from PIL import Image
++import random
++import torch
++import numpy as np
++import utils.util as util
++from alphas.alpha_maps import get_alpha_map
++
++
++class AlphaBlendDataset(BaseDataset):
++    """
++    Dataset that creates blended images using random alpha values.
++    Supports both scalar and spatially-varying alpha maps.
++
++    Returns:
++        A dict with keys:
++            'A': Ground truth component A (alpha * img_A)
++            'B': Ground truth component B ((1-alpha) * img_B)
++            'input': Blended image (A + B)
++            'alpha_map': Alpha map used for blending
++            'A_paths': Path to image A
++            'B_paths': Path to image B
++    """
++
++    @staticmethod
++    def modify_commandline_options(parser, is_train):
++        """Add alpha-specific options."""
++        parser.add_argument('--alpha_mode', type=str, default='scalar',
++                            choices=['scalar', 'spatial'],
++                            help='Alpha mode: scalar for constant, spatial for polynomial map')
++        parser.add_argument('--alpha_min', type=float, default=0.4,
++                            help='Minimum alpha value')
++        parser.add_argument('--alpha_max', type=float, default=0.6,
++                            help='Maximum alpha value')
++        return parser
++
++    def __init__(self, opt):
++        """Initialize this dataset class.
++
++        Parameters:
++            opt (Option class) -- stores all the experiment flags
++        """
++        BaseDataset.__init__(self, opt)
++        self.dir_A = os.path.join(opt.dataroot, opt.phase + 'A')
++        self.dir_B = os.path.join(opt.dataroot, opt.phase + 'B')
++
++        if opt.phase == "test" and not os.path.exists(self.dir_A) \
++           and os.path.exists(os.path.join(opt.dataroot, "valA")):
++            self.dir_A = os.path.join(opt.dataroot, "valA")
++            self.dir_B = os.path.join(opt.dataroot, "valB")
++
++        self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))
++        self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))
++        self.A_size = len(self.A_paths)
++        self.B_size = len(self.B_paths)
++
++        # Alpha parameters
++        self.alpha_mode = opt.alpha_mode
++        self.alpha_min = opt.alpha_min
++        self.alpha_max = opt.alpha_max
++
++        print(f"AlphaBlendDataset initialized:")
++        print(f"  Mode: {self.alpha_mode}")
++        print(f"  Alpha range: [{self.alpha_min}, {self.alpha_max}]")
++        print(f"  A images: {self.A_size}")
++        print(f"  B images: {self.B_size}")
++
++    def _generate_alpha(self, size):
++        """Generate alpha map based on mode.
++
++        Args:
++            size: Image size (H, W)
++
++        Returns:
++            alpha_map: Tensor of shape [H, W]
++        """
++        if self.alpha_mode == 'scalar':
++            # Scalar alpha: [alpha, 0, 0, 0, 0, 0] for constant polynomial
++            alpha_value = random.uniform(self.alpha_min, self.alpha_max)
++            init_alpha = [alpha_value, 0.0, 0.0, 0.0, 0.0, 0.0]
++        elif self.alpha_mode == 'spatial':
++            # Spatially-varying polynomial alpha map
++            init_alpha = None  # Will be randomly initialized
++        else:
++            raise ValueError(f"Unknown alpha_mode: {self.alpha_mode}")
++
++        # Create alpha map using the polynomial class
++        alpha_map_obj = get_alpha_map(
++            'param_2d_order',
++            size=size,
++            device='cpu',
++            alpha_min=self.alpha_min,
++            alpha_max=self.alpha_max,
++            init_alpha=init_alpha,
++        )
++
++        # Get the alpha map as a tensor [H, W]
++        alpha_map = alpha_map_obj.forward()
++
++        return alpha_map
++
++    def __getitem__(self, index):
++        """Return a data point and its metadata information.
++
++        Parameters:
++            index (int) -- a random integer for data indexing
++
++        Returns a dictionary that contains A, B, input, alpha_map, paths
++            A (tensor)       -- scaled image A component (alpha * img_A)
++            B (tensor)       -- scaled image B component ((1-alpha) * img_B)
++            input (tensor)   -- blended image (A + B)
++            alpha_map (tensor) -- alpha map used for blending [1, H, W]
++            A_paths (str)    -- image paths
++            B_paths (str)    -- image paths
++        """
++        A_path = self.A_paths[index % self.A_size]
++        if self.opt.serial_batches:
++            index_B = index % self.B_size
++        else:
++            index_B = random.randint(0, self.B_size - 1)
++        B_path = self.B_paths[index_B]
++
++        A_img = Image.open(A_path).convert('RGB')
++        B_img = Image.open(B_path).convert('RGB')
++
++        # Apply synchronized transformations to both images
++        # Get transformation parameters
++        is_finetuning = self.opt.isTrain and self.current_epoch > self.opt.n_epochs
++        modified_opt = util.copyconf(
++            self.opt,
++            load_size=self.opt.crop_size if is_finetuning else self.opt.load_size
++        )
++
++        # Get same transform params for both images to ensure alignment
++        transform_params = get_params(modified_opt, A_img.size)
++        transform_A = get_transform(modified_opt, transform_params)
++        transform_B = get_transform(modified_opt, transform_params)
++
++        A_tensor = transform_A(A_img)  # [3, H, W] in [-1, 1]
++        B_tensor = transform_B(B_img)  # [3, H, W] in [-1, 1]
++
++        # Generate alpha map for the cropped size
++        _, H, W = A_tensor.shape
++        alpha_map = self._generate_alpha(H)  # [H, W]
++
++        # Expand alpha to [3, H, W] for broadcasting
++        alpha_3ch = alpha_map.unsqueeze(0).expand(3, -1, -1)
++
++        # Convert from [-1, 1] to [0, 1] for blending
++        A_01 = (A_tensor + 1) / 2.0
++        B_01 = (B_tensor + 1) / 2.0
++
++        # Blend using alpha map: gt_A = alpha * img_A, gt_B = (1-alpha) * img_B
++        A_scaled = A_01 * alpha_3ch
++        B_scaled = B_01 * (1 - alpha_3ch)
++        input_blend = A_scaled + B_scaled
++
++        # Convert back to [-1, 1] range for model
++        A_scaled = A_scaled * 2.0 - 1.0
++        B_scaled = B_scaled * 2.0 - 1.0
++        input_blend = input_blend * 2.0 - 1.0
++
++        # Add channel dimension to alpha_map for consistency [1, H, W]
++        alpha_map = alpha_map.unsqueeze(0)
++
++        # For BID model compatibility, we need to provide:
++        # - A and B as the ground truth components (what model should predict)
++        # - The model will use A and B from dataset, not create its own mix
++        # Actually, looking at BID code, it mixes A and B internally...
++        # We need to pass the original images so BID can use them
++        # But we also need our blended input
++
++        # Return in BID expected format
++        return {
++            'A': A_tensor,           # Original image A in [-1, 1]
++            'B': B_tensor,           # Original image B in [-1, 1]
++            'A_scaled': A_scaled,    # Alpha-scaled component for reference
++            'B_scaled': B_scaled,    # Alpha-scaled component for reference
++            'input': input_blend,    # Pre-blended input with our alpha
++            'alpha_map': alpha_map,  # Alpha map [1, H, W]
++            'A_paths': A_path,
++            'B_paths': B_path
++        }
++
++    def __len__(self):
++        """Return the total number of images in the dataset."""
++        return max(self.A_size, self.B_size)
+diff --git a/data/jointremoval_dataset.py b/data/jointremoval_dataset.py
+index cc59ac7..916ecc0 100644
+--- a/data/jointremoval_dataset.py
++++ b/data/jointremoval_dataset.py
+@@ -3,7 +3,7 @@ from data.base_dataset import BaseDataset, get_transform, get_params
+ from data.image_folder import make_dataset
+ from PIL import Image
+ import random
+-import util.util as util
++import utils.util as util
+ 
+ 
+ class JointremovalDataset(BaseDataset):
+diff --git a/data/raina_dataset.py b/data/raina_dataset.py
+index ab35cf5..31d8f0e 100644
+--- a/data/raina_dataset.py
++++ b/data/raina_dataset.py
+@@ -3,7 +3,7 @@ from data.base_dataset import BaseDataset, get_transform, get_params
+ from data.image_folder import make_dataset
+ from PIL import Image
+ import random
+-import util.util as util
++import utils.util as util
+ 
+ 
+ class RainaDataset(BaseDataset):
+diff --git a/data/rainb_dataset.py b/data/rainb_dataset.py
+index d82d542..e1b1e1d 100644
+--- a/data/rainb_dataset.py
++++ b/data/rainb_dataset.py
+@@ -3,7 +3,7 @@ from data.base_dataset import BaseDataset, get_transform, get_params
+ from data.image_folder import make_dataset
+ from PIL import Image
+ import random
+-import util.util as util
++import utils.util as util
+ 
+ 
+ class RainbDataset(BaseDataset):
+diff --git a/data/unaligned2_dataset.py b/data/unaligned2_dataset.py
+index 882dce4..c79d1b4 100644
+--- a/data/unaligned2_dataset.py
++++ b/data/unaligned2_dataset.py
+@@ -3,7 +3,7 @@ from data.base_dataset import BaseDataset, get_transform
+ from data.image_folder import make_dataset
+ from PIL import Image
+ import random
+-import util.util as util
++import utils.util as util
+ 
+ 
+ class Unaligned2Dataset(BaseDataset):
+diff --git a/data/unaligned3_dataset.py b/data/unaligned3_dataset.py
+index 8adfb30..b3f4890 100644
+--- a/data/unaligned3_dataset.py
++++ b/data/unaligned3_dataset.py
+@@ -3,7 +3,7 @@ from data.base_dataset import BaseDataset, get_transform
+ from data.image_folder import make_dataset
+ from PIL import Image
+ import random
+-import util.util as util
++import utils.util as util
+ 
+ 
+ class Unaligned3Dataset(BaseDataset):
+diff --git a/data/unaligned4_dataset.py b/data/unaligned4_dataset.py
+index 7148346..94fc97f 100644
+--- a/data/unaligned4_dataset.py
++++ b/data/unaligned4_dataset.py
+@@ -3,7 +3,7 @@ from data.base_dataset import BaseDataset, get_transform
+ from data.image_folder import make_dataset
+ from PIL import Image
+ import random
+-import util.util as util
++import utils.util as util
+ 
+ 
+ class Unaligned4Dataset(BaseDataset):
+diff --git a/data/unaligned5_dataset.py b/data/unaligned5_dataset.py
+index e56dace..1b862a6 100644
+--- a/data/unaligned5_dataset.py
++++ b/data/unaligned5_dataset.py
+@@ -3,7 +3,7 @@ from data.base_dataset import BaseDataset, get_transform
+ from data.image_folder import make_dataset
+ from PIL import Image
+ import random
+-import util.util as util
++import utils.util as util
+ 
+ 
+ class Unaligned5Dataset(BaseDataset):
+diff --git a/data/unaligned8_dataset.py b/data/unaligned8_dataset.py
+index 7e595e4..5f1b99b 100644
+--- a/data/unaligned8_dataset.py
++++ b/data/unaligned8_dataset.py
+@@ -3,7 +3,7 @@ from data.base_dataset import BaseDataset, get_transform
+ from data.image_folder import make_dataset
+ from PIL import Image
+ import random
+-import util.util as util
++import utils.util as util
+ 
+ 
+ class Unaligned8Dataset(BaseDataset):
+diff --git a/models/alphabiden_model.py b/models/alphabiden_model.py
+new file mode 100644
+index 0000000..afb64d1
+--- /dev/null
++++ b/models/alphabiden_model.py
+@@ -0,0 +1,154 @@
++"""
++Alpha-based BID model that uses pre-computed alpha blending
++instead of random internal mixing.
++
++Based on biden2_model.py but modified to:
++1. Accept pre-blended inputs from dataset
++2. Use provided alpha maps instead of random mixing
++3. Train to decompose alpha-blended images
++"""
++
++import torch
++from .biden2_model import BIDEN2Model
++
++
++class AlphaBIDeNModel(BIDEN2Model):
++    """BID model adapted for alpha-based blending training."""
++
++    @staticmethod
++    def modify_commandline_options(parser, is_train=True):
++        """Add model-specific options"""
++        parser = BIDEN2Model.modify_commandline_options(parser, is_train)
++        # Alpha-specific options are in the dataset
++        return parser
++
++    def set_input(self, input):
++        """
++        Unpack input data from the dataloader.
++
++        For alpha training, we receive:
++        - 'A': Original image A
++        - 'B': Original image B
++        - 'input': Pre-blended image with our alpha
++        - 'alpha_map': The alpha map used for blending
++        """
++        self.real_A = input['A'].to(self.device)
++        self.real_B = input['B'].to(self.device)
++        # alpha_test.py provides 'alpha'; the alpha_blend training dataset 'alpha_map'.
++        alpha = input['alpha'] if 'alpha' in input else input['alpha_map']
++        self.alpha_map = alpha.to(self.device) if torch.is_tensor(alpha) else alpha
++        self.real_input  =  (self.real_A * self.alpha_map  + (1 - self.alpha_map) * self.real_B)
++
++    def forward(self):
++        """
++        Run forward pass with pre-computed blending.
++
++        Unlike original BID which creates random mix internally,
++        we use the pre-blended input from the dataset.
++        """
++        # If we have pre-blended input, use it directly
++        if self.real_input is not None:
++            # Set labels to indicate both components are present
++            # (equivalent to alpha and 1-alpha weighting)
++            self.label[0] = 1.0
++            self.label[1] = 1.0
++            self.loss_sum = torch.tensor(2.0).to(self.device)  # Sum of weights
++
++        else:
++            # Fallback to original BID random mixing
++            label_sum = 0
++            while label_sum < 1:
++                p = torch.rand(self.opt.max_domain)
++                for i in range(self.opt.max_domain):
++                    if p[i] < self.opt.prob:
++                        self.label[i] = 1
++                    else:
++                        self.label[i] = 0
++                label_sum = torch.sum(self.label, 0)
++
++            self.real_input = (self.real_A * self.label[0] + self.real_B * self.label[1]) / label_sum
++            self.loss_sum = label_sum
++
++        # Forward through networks (same as original)
++        self.fake_all = self.netE(self.real_input)
++        self.fake_A = self.netH1(self.fake_all)
++        self.fake_B = self.netH2(self.fake_all)
++
++    def compute_D_loss(self):
++        """Calculate GAN loss and BCE loss for the discriminator (batch-aware)"""
++        fake1 = self.fake_A.detach()
++        fake2 = self.fake_B.detach()
++        pred_fake1 = self.netD(0, fake1)
++        pred_fake2 = self.netD(0, fake2)
++        self.loss_D_fake = self.criterionGAN(pred_fake1, False) * self.label[0] \
++                           + self.criterionGAN(pred_fake2, False) * self.label[1]
++
++        # Real
++        self.pred_real1 = self.netD(0, self.real_A)
++        self.pred_real2 = self.netD(0, self.real_B)
++
++        self.loss_D_real = self.criterionGAN(self.pred_real1, True) * self.label[0] \
++                           + self.criterionGAN(self.pred_real2, True) * self.label[1]
++
++        # BCE loss, netD(1) for the source prediction branch.
++        # Fix: use view(-1, max_domain) to handle batch size correctly
++        batch_size = self.real_input.size(0)
++        self.predict_label = self.netD(1, self.real_input).view(batch_size, self.opt.max_domain)
++
++        # Expand label to match batch size
++        label_expanded = self.label.unsqueeze(0).expand(batch_size, -1)
++        self.loss_BCE = self.criterionBCE(self.predict_label, label_expanded)
++
++        # combine loss and calculate gradients
++        self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5 * self.opt.lambda_GAN + self.loss_BCE * self.opt.lambda_BCE
++        return self.loss_D
++
++    def compute_G_loss(self):
++        """
++        Calculate loss for generator (batch-aware).
++        Modified to handle alpha-based training and batch processing.
++        """
++        # GAN loss (combined for both outputs)
++        pred_fake1 = self.netD(0, self.fake_A)
++        pred_fake2 = self.netD(0, self.fake_B)
++        self.loss_G_GAN = self.criterionGAN(pred_fake1, True) * self.label[0] + \
++                          self.criterionGAN(pred_fake2, True) * self.label[1]
++
++        # Reconstruction loss (L1)
++        self.loss_Ln = self.criterionL1(self.fake_A, self.real_A) * self.label[0] + \
++                       self.criterionL1(self.fake_B, self.real_B) * self.label[1]
++
++        # VGG perceptual loss
++        self.loss_VGG = self.criterionVGG(self.fake_A, self.real_A) * self.label[0] + \
++                        self.criterionVGG(self.fake_B, self.real_B) * self.label[1]
++
++        # BCE loss for source prediction
++        # Fix: use view(-1, max_domain) to handle batch size correctly
++        batch_size = self.real_input.size(0)
++        self.predict_label = self.netD(1, self.real_input).view(batch_size, self.opt.max_domain)
++
++        # Expand label to match batch size
++        label_expanded = self.label.unsqueeze(0).expand(batch_size, -1)
++        self.loss_BCE = self.criterionBCE(self.predict_label, label_expanded)
++
++        # Total loss
++        self.loss_G = self.loss_G_GAN * self.opt.lambda_GAN + \
++                     self.loss_Ln * self.opt.lambda_Ln + \
++                     self.loss_VGG * self.opt.lambda_VGG + \
++                     self.loss_BCE * self.opt.lambda_BCE
++
++        return self.loss_G
++
++    def forward_test(self):
++        gt_label = [0] * self.opt.max_domain
++        self.real_input = (self.real_A * self.alpha_map  + (1 - self.alpha_map) * self.real_B)
++        self.fake_all = self.netE(self.real_input)
++        self.predict_label = self.netD(1, self.real_input).view(self.opt.max_domain)
++        predict_label = torch.where(self.predict_label > 0.0, 1, 0)
++        self.fake_A = self.netH1(self.fake_all)
++        self.fake_B = self.netH2(self.fake_all)
++        if predict_label.tolist() == gt_label:
++            self.correct = self.correct + 1
++        self.all_count = self.all_count + 1
++        if self.all_count == 300:
++            print(self.correct / self.all_count)
+\ No newline at end of file
+diff --git a/models/my_biden2_model.py b/models/my_biden2_model.py
+new file mode 100644
+index 0000000..61cedec
+--- /dev/null
++++ b/models/my_biden2_model.py
+@@ -0,0 +1,268 @@
++﻿import torch
++from .base_model import BaseModel
++from . import networks
++from .losses import VGGLoss
++from numpy import *
++import itertools
++
++""" 
++BIDeN model for Task I, Mixed image decomposition across multiple domains. Max number of domain = 2.
++
++Sample usage:
++Optional visualization:
++python -m visdom.server
++
++Train:
++python train.py --dataroot ./datasets/image_decom --name biden2 --model biden2 --dataset_mode unaligned2
++
++For test:
++Test a single case:
++python test.py --dataroot ./datasets/image_decom --name biden2 --model biden2 --dataset_mode unaligned2 --test_input A
++python test.py --dataroot ./datasets/image_decom --name biden2 --model biden2 --dataset_mode unaligned2 --test_input AB
++... ane other cases.
++change test_input to the case you want.
++
++Test all cases:
++python test2.py --dataroot ./datasets/image_decom --name biden2 --model biden2 --dataset_mode unaligned2
++"""
++
++class MYBIDEN2Model(BaseModel):
++    @staticmethod
++    def modify_commandline_options(parser, is_train=True):
++        """  Configures options specific for BIDeN model
++        """
++        parser.add_argument('--lambda_GAN', type=float, default=1.0, help='weight for GAN loss')
++        parser.add_argument('--lambda_Ln', type=float, default=30.0, help='weight for L1/L2 loss')
++        parser.add_argument('--lambda_VGG', type=float, default=10.0, help='weight for VGG loss')
++        parser.add_argument('--lambda_BCE', type=float, default=1.0, help='weight for BCE loss')
++        parser.add_argument('--test_input', type=str, default='A', help='test mixed images.')
++        parser.add_argument('--max_domain', type=int, default=2, help='max number of source components.')
++        parser.add_argument('--prob', type=float, default=0.9, help='probability of adding a component')
++        parser.add_argument('--test_choice', type=int, default=1, help='choice for test mode, 1 for one case,'
++                                                                       ' 0 for all cases. Will be set automatically.')
++        opt, _ = parser.parse_known_args()
++        return parser
++
++    def __init__(self, opt):
++        BaseModel.__init__(self, opt)
++
++        # specify the training losses you want to print out.
++        # The training/test scripts will call <BaseModel.get_current_losses>
++        self.loss_names = ['G_GAN', 'D_real', 'D_fake', 'Ln', 'VGG', 'BCE']
++        self.visual_names = ['fake_A', 'fake_B', 'real_A', 'real_B', 'real_input']
++        self.model_names = ['D', 'E', 'H1', 'H2']
++
++        # Define networks (both generator and discriminator)
++        # Define Encoder E.
++        self.netE = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, 'encoder', opt.normG,
++                                      not opt.no_dropout, opt.init_type, opt.init_gain, opt.no_antialias,
++                                      opt.no_antialias_up, self.gpu_ids, opt)
++        # Define Heads H.
++        self.netH1 = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, 'head', opt.normG,
++                                       not opt.no_dropout, opt.init_type, opt.init_gain, opt.no_antialias,
++                                       opt.no_antialias_up, self.gpu_ids, opt)
++        self.netH2 = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, 'head', opt.normG,
++                                       not opt.no_dropout, opt.init_type, opt.init_gain, opt.no_antialias,
++                                       opt.no_antialias_up, self.gpu_ids, opt)
++
++        self.label = torch.zeros(self.opt.max_domain).to(self.device)
++        self.netD = networks.define_D(opt.output_nc, self.opt.max_domain, 'BIDeN_D', opt.n_layers_D, opt.normD,
++                                      opt.init_type,
++                                      opt.init_gain, opt.no_antialias, self.gpu_ids, opt)
++        self.correct = 0
++        self.all_count = 0
++        self.psnr_count = [0] * self.opt.max_domain
++        self.acc_all = 0
++        self.test_time = 0
++        self.criterionL2 = torch.nn.MSELoss().to(self.device)
++
++        if self.isTrain:
++            # define loss functions
++            self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)
++            self.criterionVGG = VGGLoss(opt).to(self.device)
++            self.criterionL1 = torch.nn.L1Loss().to(self.device)
++            self.criterionBCE = torch.nn.BCEWithLogitsLoss().to(self.device)
++            self.optimizer_G = torch.optim.Adam(
++                itertools.chain(self.netE.parameters(), self.netH1.parameters(),
++                                self.netH2.parameters()),
++                lr=opt.lr, betas=(opt.beta1, opt.beta2))
++            self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=opt.lr, betas=(opt.beta1, opt.beta2))
++            self.optimizers.append(self.optimizer_G)
++            self.optimizers.append(self.optimizer_D)
++
++
++    def data_dependent_initialize(self, data):
++        self.set_input(data)
++        bs_per_gpu = self.real_A.size(0) // max(len(self.opt.gpu_ids), 1)
++        self.real_A = self.real_A[:bs_per_gpu]
++        self.real_B = self.real_B[:bs_per_gpu]
++        self.forward()
++        if self.opt.isTrain:
++            self.compute_D_loss().backward()  # calculate gradients for D
++            self.compute_G_loss().backward()  # calculate graidents for G
++
++    def optimize_parameters(self):
++        # forward
++        self.forward()
++
++        # update D
++        self.set_requires_grad(self.netD, True)
++        self.optimizer_D.zero_grad()
++        self.loss_D = self.compute_D_loss()
++        self.loss_D.backward()
++        self.optimizer_D.step()
++
++        # update G
++        self.set_requires_grad(self.netD, False)
++        self.optimizer_G.zero_grad()
++        self.loss_G = self.compute_G_loss()
++        self.loss_G.backward()
++        self.optimizer_G.step()
++
++
++    def set_input(self, input):
++        """Unpack input data from the dataloader and perform necessary pre-processing steps.
++        Parameters:
++            input (dict): include the data itself and its metadata information.
++        """
++        self.real_A = input['image1'].to(self.device)
++        self.real_B = input['image2'].to(self.device)
++        self.alpha = input['alpha']
++
++    def forward(self):
++        """
++        Run forward pass; called by both functions <optimize_parameters>.
++        We have another version of forward (forward_test) used in testing.
++        """
++        # If no images are used in mixing, run again.
++        label_sum = 0
++        while label_sum < 1:
++            p = torch.rand(self.opt.max_domain)
++            for i in range(self.opt.max_domain):
++                if p[i] < self.opt.prob:
++                    self.label[i] = 1
++                else:
++                    self.label[i] = 0
++            label_sum = torch.sum(self.label, 0)
++
++        self.real_input = (self.real_A * self.label[0] + self.real_B * self.label[1]) / label_sum
++        self.fake_all = self.netE(self.real_input)
++        self.fake_A = self.netH1(self.fake_all)
++        self.fake_B = self.netH2(self.fake_all)
++        self.loss_sum = label_sum
++
++
++    def compute_D_loss(self):
++        """Calculate GAN loss and BCE loss for the discriminator"""
++        fake1 = self.fake_A.detach()
++        fake2 = self.fake_B.detach()
++        pred_fake1 = self.netD(0,fake1)
++        pred_fake2 = self.netD(0,fake2)
++        self.loss_D_fake = self.criterionGAN(pred_fake1, False) * self.label[0] \
++                           + self.criterionGAN(pred_fake2, False) * self.label[1]
++
++        # Real
++        self.pred_real1 = self.netD(0,self.real_A)
++        self.pred_real2 = self.netD(0,self.real_B)
++
++        self.loss_D_real = self.criterionGAN(self.pred_real1, True) * self.label[0] \
++                           + self.criterionGAN(self.pred_real2,True) * self.label[1]
++
++        # BCE loss, netD(1) for the source prediction branch.
++        self.predict_label = self.netD(1,self.real_input).view(self.opt.max_domain)
++        self.loss_BCE = self.criterionBCE(self.predict_label, self.label)
++        # combine loss and calculate gradients
++        self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5 * self.opt.lambda_GAN + self.loss_BCE * self.opt.lambda_BCE
++        return self.loss_D
++
++    def compute_G_loss(self):
++        """Calculate GAN loss, Ln loss, VGG loss for the generator"""
++        # netD(0) for the separation branch.
++        pred_fake1 = self.netD(0,self.fake_A)
++        pred_fake2 = self.netD(0,self.fake_B)
++
++        self.loss_G_GAN = self.criterionGAN(pred_fake1, True) * self.label[0] \
++                          + self.criterionGAN(pred_fake2, True) * self.label[1]
++
++        self.loss_Ln = self.criterionL1(self.real_A, self.fake_A) * self.label[0] \
++                       + self.criterionL1(self.real_B,self.fake_B) * self.label[1]
++
++        self.loss_VGG = self.criterionVGG(self.fake_A, self.real_A) * self.label[0] \
++                        + self.criterionVGG(self.fake_B, self.real_B) * self.label[1]
++
++        self.loss_G = self.loss_G_GAN * self.opt.lambda_GAN + self.loss_Ln * self.opt.lambda_Ln \
++                      + self.loss_VGG * self.opt.lambda_VGG
++
++        return self.loss_G
++
++    def forward_test(self):
++        # Test case 1, test a single case only, write the output images.
++        if self.opt.test_choice == 1:
++            gt_label = [0] * self.opt.max_domain
++            if 'A' in self.opt.test_input:
++                gt_label[0] = 1
++            if 'B' in self.opt.test_input:
++                gt_label[1] = 1
++            self.real_input = self.real_A * self.alpha + self.real_B * (1 - self.alpha)
++            self.fake_all = self.netE(self.real_input)
++            self.predict_label = self.netD(1, self.real_input).view(self.opt.max_domain)
++            predict_label = torch.where(self.predict_label > 0.0, 1, 0)
++            self.fake_A = self.netH1(self.fake_all)
++            self.fake_B = self.netH2(self.fake_all)
++            if predict_label.tolist() == gt_label:
++                self.correct = self.correct + 1
++            self.all_count = self.all_count + 1
++            if self.all_count == 300:
++                print(self.correct / self.all_count)
++        else:
++            # Test case 0, test all cases, do not write output images.
++            gt_label = [0] * self.opt.max_domain
++            if 'A' in self.opt.test_input:
++                gt_label[0] = 1
++            if 'B' in self.opt.test_input:
++                gt_label[1] = 1
++            self.real_input = (self.real_A * gt_label[0] + self.real_B * gt_label[1])/ sum(gt_label)
++            self.predict_label = self.netD(1, self.real_input).view(self.opt.max_domain)
++            predict_label = torch.where(self.predict_label > 0.0, 1, 0)
++            self.fake_all = self.netE(self.real_input)
++            self.fake_A = self.netH1(self.fake_all)
++            self.fake_B = self.netH2(self.fake_all)
++
++            # Normalize to 0-1 for PSNR calculation.
++            self.fake_A = (self.fake_A + 1)/2
++            self.real_A = (self.real_A + 1)/2
++            self.fake_B = (self.fake_B + 1)/2
++            self.real_B = (self.real_B + 1)/2
++
++            if gt_label[0] == 1:
++                mse = self.criterionL2(self.fake_A, self.real_A)
++                psnr = 10 * log10(1 / mse.item())
++                self.psnr_count[0] += psnr
++            if gt_label[1] == 1:
++                mse = self.criterionL2(self.fake_B, self.real_B)
++                psnr = 10 * log10(1 / mse.item())
++                self.psnr_count[1] += psnr
++            if predict_label.tolist() == gt_label:
++                self.correct = self.correct + 1
++            self.all_count = self.all_count + 1
++            if self.all_count % 300 == 0:
++                acc = self.correct / self.all_count
++                print("Accuracy for current: ",acc)
++                if gt_label[0] == 1:
++                    print("PSNR_A: ", self.psnr_count[0]/ self.all_count)
++                if gt_label[1] == 1:
++                    print("PSNR_B: ", self.psnr_count[1]/ self.all_count)
++                self.all_count = 0
++                self.correct = 0
++                self.psnr_count = [0] * self.opt.max_domain
++                self.acc_all += acc
++                self.test_time +=1
++                if mean(gt_label) == 1:
++                    print("Overall Accuracy:", self.acc_all/self.test_time)
++
++    def get_current_visuals(self):
++        return {'sample1': self.fake_A,
++                'sample2': self.fake_B,
++                'blended_gt': self.real_input,
++                'blended_sample': self.alpha * self.fake_A + (1 - self.alpha) * self.fake_B,
++                }
+diff --git a/options/base_options.py b/options/base_options.py
+index ff52a25..7970478 100644
+--- a/options/base_options.py
++++ b/options/base_options.py
+@@ -1,6 +1,6 @@
+ import argparse
+ import os
+-from util import util
++from utils import util
+ import torch
+ import models
+ import data
+@@ -48,7 +48,7 @@ class BaseOptions():
+         # dataset parameters
+         parser.add_argument('--dataset_mode', type=str, default='unaligned', help='chooses how datasets are loaded. [unaligned | aligned | single | colorization]')
+         parser.add_argument('--serial_batches', action='store_true', help='if true, takes images in order to make batches, otherwise takes them randomly')
+-        parser.add_argument('--num_threads', default=8, type=int, help='# threads for loading data, set this to 0 if you are using Windows OS.')
++        parser.add_argument('--num_threads', default=32, type=int, help='# threads for loading data, set this to 0 if you are using Windows OS.')
+         parser.add_argument('--batch_size', type=int, default=1, help='input batch size')
+         parser.add_argument('--load_size', type=int, default=286, help='scale images to this size')
+         parser.add_argument('--crop_size', type=int, default=256, help='then crop to this size')
+diff --git a/options/test_options.py b/options/test_options.py
+index 5605b34..f57cb48 100644
+--- a/options/test_options.py
++++ b/options/test_options.py
+@@ -16,7 +16,12 @@ class TestOptions(BaseOptions):
+         # Set the default, we set 5000 HERE to test the whole test set.
+         parser.add_argument('--num_test', type=int, default=5000, help='how many test images to run')
+ 
++        parser.add_argument('--switch_order', action='store_true',
++                            help='use eval mode during test time.')
++
+         # To avoid cropping, the load_size should be the same as crop_size
+         parser.set_defaults(load_size=parser.get_default('crop_size'))
++
++
+         self.isTrain = False
+         return parser
+diff --git a/test.py b/test.py
+index 567cc85..7e934a7 100644
+--- a/test.py
++++ b/test.py
+@@ -2,12 +2,16 @@
+ General-purpose test script for BIDeN.
+ """
+ import os
++
++from torch.utils.data import Dataset, DataLoader
++
+ from options.test_options import TestOptions
+ from data import create_dataset
+ from models import create_model
+-from util.visualizer import save_images
+-from util import html
+-import util.util as util
++from utils.visualizer import save_images
++from utils import html
++import utils.util as util
++from skimage.metrics import structural_similarity
+ 
+ 
+ if __name__ == '__main__':
+@@ -19,7 +23,7 @@ if __name__ == '__main__':
+     opt.no_flip = True    # no flip; comment this line if results on flipped images are needed.
+     opt.display_id = -1   # no visdom display; the test code saves the results to a HTML file.
+     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
+-    train_dataset = create_dataset(util.copyconf(opt, phase="train"))
++
+     model = create_model(opt)      # create a model given opt.model and other options
+     # create a webpage for viewing the results
+     web_dir = os.path.join(opt.results_dir, opt.name, '{}_{}'.format(opt.phase, opt.epoch))  # define the website directory
+diff --git a/test2.py b/test2.py
+index bd6aa18..616bb16 100644
+--- a/test2.py
++++ b/test2.py
+@@ -6,8 +6,8 @@ import os
+ from options.test_options import TestOptions
+ from data import create_dataset
+ from models import create_model
+-from util import html
+-import util.util as util
++from utils import html
++import utils.util as util
+ from itertools import combinations
+ 
+ 
+diff --git a/train.py b/train.py
+index 6ad7975..b6e79e2 100644
+--- a/train.py
++++ b/train.py
+@@ -3,7 +3,7 @@ import torch
+ from options.train_options import TrainOptions
+ from data import create_dataset
+ from models import create_model
+-from util.visualizer import Visualizer
++from utils.visualizer import Visualizer
+ 
+ 
+ if __name__ == '__main__':
+diff --git a/train_fid.py b/train_fid.py
+index 4728774..9950304 100644
+--- a/train_fid.py
++++ b/train_fid.py
+@@ -5,8 +5,8 @@ from options.train_options import TrainOptions
+ from options.test_options import TestOptions
+ from data import create_dataset
+ from models import create_model
+-from util import html
+-from util.visualizer import Visualizer, save_images
++from utils import html
++from utils.visualizer import Visualizer, save_images
+ from pytorch_fid.fid_score import calculate_fid_given_paths
+ """
+ This one measures the FID during training. You need to create validations sets. 
+diff --git a/util/__init__.py b/utils/__init__.py
+similarity index 81%
+rename from util/__init__.py
+rename to utils/__init__.py
+index 718f8f6..f6b68f0 100644
+--- a/util/__init__.py
++++ b/utils/__init__.py
+@@ -1,2 +1,2 @@
+ """This package includes a miscellaneous collection of useful helper functions."""
+-from util import *
++from utils import *
+\ No newline at end of file
+diff --git a/util/get_data.py b/utils/get_data.py
+similarity index 95%
+rename from util/get_data.py
+rename to utils/get_data.py
+index 97edc3c..6bf899f 100644
+--- a/util/get_data.py
++++ b/utils/get_data.py
+@@ -16,11 +16,13 @@ class GetData(object):
+         verbose (bool)  -- If True, print additional information.
+ 
+     Examples:
+-        >>> from util.get_data import GetData
++        >>> from utils.get_data import GetData
+         >>> gd = GetData(technique='cyclegan')
+-        >>> new_data_path = gd.get(save_path='./datasets')  # options will be displayed.
++        >>> new_data_path = gd.get(save_path='./datasets')  # options will
++        be displayed.
+ 
+-    Alternatively, You can use bash scripts: 'scripts/download_pix2pix_model.sh'
++    Alternatively, You can use bash scripts:
++    'scripts/download_pix2pix_model.sh'
+     and 'scripts/download_cyclegan_model.sh'.
+     """
+ 
+diff --git a/util/html.py b/utils/html.py
+similarity index 100%
+rename from util/html.py
+rename to utils/html.py
+diff --git a/util/image_pool.py b/utils/image_pool.py
+similarity index 100%
+rename from util/image_pool.py
+rename to utils/image_pool.py
+diff --git a/util/util.py b/utils/util.py
+similarity index 91%
+rename from util/util.py
+rename to utils/util.py
+index 5702d37..464588b 100644
+--- a/util/util.py
++++ b/utils/util.py
+@@ -1,13 +1,17 @@
+ """This module contains simple helper functions """
+ from __future__ import print_function
+-import torch
+-import numpy as np
+-from PIL import Image
+-import os
+-import importlib
++
+ import argparse
++import importlib
++import os
+ from argparse import Namespace
++
++import matplotlib.pyplot as plt
++import numpy as np
++import torch
+ import torchvision
++from PIL import Image
++from torchvision.utils import make_grid
+ 
+ 
+ def str2bool(v):
+@@ -164,3 +168,20 @@ def correct_resize(t, size, mode=Image.BICUBIC):
+         resized_t = torchvision.transforms.functional.to_tensor(one_image) * 2 - 1.0
+         resized.append(resized_t)
+     return torch.stack(resized, dim=0).to(device)
++
++
++def normalize_np(img):
++    """ Normalize img in arbitrary range to [0, 1] """
++
++    img -= np.min(img)
++    if not np.all(img == img[0]):
++        img /= np.max(img)
++    return img
++
++
++def show_tensor(img):
++    img = make_grid(img)
++    if len(img.shape) < 4:
++        img = img.unsqueeze(0)
++    plt.imshow(normalize_np(img.permute(0, 2, 3, 1).cpu().detach().numpy()[0]))
++    plt.show()
+diff --git a/util/visualizer.py b/utils/visualizer.py
+similarity index 99%
+rename from util/visualizer.py
+rename to utils/visualizer.py
+index 0f41a8a..f295459 100644
+--- a/util/visualizer.py
++++ b/utils/visualizer.py
+@@ -5,6 +5,8 @@ import ntpath
+ import time
+ from . import util, html
+ from subprocess import Popen, PIPE
++from pathlib import Path
++
+ 
+ if sys.version_info[0] == 2:
+     VisdomExceptionBase = Exception

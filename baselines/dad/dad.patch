@@ -1,0 +1,1387 @@
+diff --git a/alpha_dataset.py b/alpha_dataset.py
+new file mode 100644
+index 0000000..11abc99
+--- /dev/null
++++ b/alpha_dataset.py
+@@ -0,0 +1,204 @@
++import numpy as np
++import cv2
++import os
++import glob
++import random
++import sys
++
++import torch
++import torchvision.transforms.functional as TF
++from torch.utils.data import Dataset
++
++# Add the alphas directory to the path
++sys.path.append(os.path.join(os.path.dirname(__file__), 'alphas'))
++from alpha_maps import get_alpha_map
++
++
++class DataAugmentation:
++    """Data augmentation for training - same as original DAD"""
++
++    def __init__(
++            self,
++            img_size,
++            with_random_hflip=False,
++            with_random_crop=False,
++    ):
++        self.img_size = img_size
++        self.with_random_hflip = with_random_hflip
++        self.with_random_crop = with_random_crop
++
++    def transform_triplets(self, img, gt1, gt2):
++        """Transform image triplet with same augmentation"""
++        # resize image and covert to tensor
++        img = TF.to_pil_image(img)
++        img = TF.resize(img, [self.img_size, self.img_size])
++
++        gt1 = TF.to_pil_image(gt1)
++        gt1 = TF.resize(gt1, [self.img_size, self.img_size])
++
++        gt2 = TF.to_pil_image(gt2)
++        gt2 = TF.resize(gt2, [self.img_size, self.img_size])
++
++        if self.with_random_hflip and random.random() > 0.5:
++            img = TF.hflip(img)
++            gt1 = TF.hflip(gt1)
++            gt2 = TF.hflip(gt2)
++
++        if self.with_random_crop and random.random() > 0.5:
++            from torchvision import transforms
++            i, j, h, w = transforms.RandomResizedCrop(size=self.img_size). \
++                get_params(img=img, scale=(0.5, 1.0), ratio=(0.9, 1.1))
++            img = TF.resized_crop(
++                img, i, j, h, w, size=(self.img_size, self.img_size))
++            gt1 = TF.resized_crop(
++                gt1, i, j, h, w, size=(self.img_size, self.img_size))
++            gt2 = TF.resized_crop(
++                gt2, i, j, h, w, size=(self.img_size, self.img_size))
++
++        # to tensor - converts [0, 255] to [0, 1]
++        img = TF.to_tensor(img)
++        gt1 = TF.to_tensor(gt1)
++        gt2 = TF.to_tensor(gt2)
++
++        return img, gt1, gt2
++
++
++class AlphaBlendingDataset(Dataset):
++    """
++    Dataset that creates blended images using random alpha values.
++    Supports both scalar and spatially-varying alpha maps.
++    """
++
++    def __init__(self,
++                 root_dir_1,
++                 root_dir_2,
++                 img_size=256,
++                 alpha_mode='scalar',  # 'scalar' or 'spatial'
++                 alpha_min=0.4,
++                 alpha_max=0.6,
++                 suff='.jpg',
++                 is_train=True):
++        """
++        Args:
++            root_dir_1: Path to first folder of images
++            root_dir_2: Path to second folder of images
++            img_size: Size to resize images to
++            alpha_mode: 'scalar' for constant alpha, 'spatial' for polynomial alpha map
++            alpha_min: Minimum alpha value
++            alpha_max: Maximum alpha value
++            suff: Image file suffix
++            is_train: Whether this is training or validation
++        """
++        self.root_dir_1 = root_dir_1
++        self.root_dir_2 = root_dir_2
++        self.dirs_1 = glob.glob(os.path.join(self.root_dir_1, '*'+suff))
++        self.dirs_2 = glob.glob(os.path.join(self.root_dir_2, '*'+suff))
++        self.img_size = img_size
++        self.alpha_mode = alpha_mode
++        self.alpha_min = alpha_min
++        self.alpha_max = alpha_max
++
++        if is_train:
++            self.augm = DataAugmentation(
++                img_size=self.img_size,
++                with_random_hflip=True,
++                with_random_crop=True)
++        else:
++            self.augm = DataAugmentation(
++                img_size=self.img_size,
++                with_random_hflip=False,
++                with_random_crop=False)
++
++    def __len__(self):
++        return max(len(self.dirs_1), len(self.dirs_2))
++
++    def _generate_alpha(self):
++        """Generate alpha values based on mode"""
++        if self.alpha_mode == 'scalar':
++            # Scalar alpha: [alpha, 0, 0, 0, 0, 0] for constant polynomial
++            alpha_value = random.uniform(self.alpha_min, self.alpha_max)
++            init_alpha = [alpha_value, 0.0, 0.0, 0.0, 0.0, 0.0]
++        elif self.alpha_mode == 'spatial':
++            # Spatially-varying polynomial alpha map
++            # Let the ParamSecondOrderMap generate random coefficients
++            init_alpha = None  # Will be randomly initialized within [alpha_min, alpha_max]
++        else:
++            raise ValueError(f"Unknown alpha_mode: {self.alpha_mode}")
++
++        # Create alpha map using the polynomial class
++        alpha_map_obj = get_alpha_map(
++            'param_2d_order',
++            size=self.img_size,
++            device='cpu',
++            alpha_min=self.alpha_min,
++            alpha_max=self.alpha_max,
++            init_alpha=init_alpha,
++            requires_grad=False
++        )
++
++        # Get the alpha map as a tensor [H, W]
++        alpha_map = alpha_map_obj.forward()  # [H, W]
++
++        return alpha_map
++
++    def __getitem__(self, idx):
++        if torch.is_tensor(idx):
++            idx = idx.tolist()
++
++        # Load first image
++        this_dir = self.dirs_1[idx]
++        img1 = cv2.imread(this_dir, cv2.IMREAD_COLOR)
++        img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
++
++        # Load second image (random from second folder)
++        rand_idx = random.randint(0, len(self.dirs_2)-1)
++        this_dir = self.dirs_2[rand_idx]
++        img2 = cv2.imread(this_dir, cv2.IMREAD_COLOR)
++        img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
++
++        # Generate alpha map
++        alpha_map = self._generate_alpha()  # [H, W]
++
++        # Resize images first, then blend
++        img1 = TF.to_pil_image(img1)
++        img1 = TF.resize(img1, [self.img_size, self.img_size])
++        img1 = TF.to_tensor(img1)  # [3, H, W] in [0, 1]
++
++        img2 = TF.to_pil_image(img2)
++        img2 = TF.resize(img2, [self.img_size, self.img_size])
++        img2 = TF.to_tensor(img2)  # [3, H, W] in [0, 1]
++
++        # Blend using alpha map
++        # alpha_map is [H, W], need to broadcast to [3, H, W]
++        alpha_map_3ch = alpha_map.unsqueeze(0).expand(3, -1, -1)  # [3, H, W]
++
++        # Create blended image: mix = img1 * alpha + img2 * (1-alpha)
++        # Keep gt1 and gt2 as the original images (not scaled by alpha)
++        # This keeps all images in [0, 1] range for easier visualization and training
++        img_mix = img1 * alpha_map_3ch + img2 * (1 - alpha_map_3ch)
++        gt1 = img1
++        gt2 = img2
++
++        # Convert to numpy for augmentation (if needed)
++        # Actually, the augmentation expects PIL or numpy, but we already have tensors
++        # Let's convert back to numpy for augmentation compatibility
++        img_mix_np = (img_mix.numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
++        gt1_np = (gt1.numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
++        gt2_np = (gt2.numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
++
++        # Apply augmentation (which will convert back to tensor)
++        img_mix, gt1, gt2 = self.augm.transform_triplets(img_mix_np, gt1_np, gt2_np)
++
++        # Also need to apply same augmentation to alpha map
++        # For simplicity, we'll regenerate it after augmentation
++        # But this is not ideal - we should transform the alpha map too
++        # For now, keep the original alpha_map (before augmentation)
++
++        data = {
++            'input': img_mix,
++            'gt1': gt1,
++            'gt2': gt2,
++            'alpha_map': alpha_map,  # [H, W] for visualization
++        }
++
++        return data
+diff --git a/alpha_eval_unmix.py b/alpha_eval_unmix.py
+new file mode 100644
+index 0000000..91d0a6a
+--- /dev/null
++++ b/alpha_eval_unmix.py
+@@ -0,0 +1,329 @@
++"""
++Evaluation script for alpha-trained DAD model.
++This script evaluates the model on the BID dataset and saves outputs
++with correct normalization for [0, 1] range models.
++"""
++
++import argparse
++import ast
++import json
++import os
++from pathlib import Path
++from typing import Union, Dict, Any
++
++import matplotlib.pyplot as plt
++import numpy as np
++import pandas as pd
++import torch
++from PIL import Image
++from torch.utils.data import DataLoader, Dataset
++from torchvision.transforms.transforms import ToTensor
++from tqdm import tqdm
++
++import cyclegan_networks as cycnet
++
++# Add the alphas directory to the path
++import sys
++sys.path.append(os.path.join(os.path.dirname(__file__), 'alphas'))
++from alpha_maps import get_alpha_map
++
++
++# Decide which device we want to run on
++device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
++
++parser = argparse.ArgumentParser(description='Eval BID Dataset with Alpha-trained Model')
++parser.add_argument('--dataset', type=str, required=True,
++                    help="Path to dataset CSV file")
++parser.add_argument('--in_size', type=int, default=256, metavar='N',
++                    help='size of input image during eval (default: 256)')
++parser.add_argument('--ckptdir', type=str, default='./outputs_alpha/checkpoints',
++                    help='checkpoints dir (default: ./outputs_alpha/checkpoints)')
++parser.add_argument('--net_G', type=str, default='unet_256', metavar='str',
++                    help='net_G: unet_512, unet_256 or unet_128 or unet_64 (default: unet_128)')
++parser.add_argument('--save_dir', type=str, required=True,
++                    help='output directory for saving results')
++parser.add_argument('--clip_max', type=float, default=1.0,
++                    help='Outputs are clipped to [0, clip_max] and divided by clip_max. Use 0.5 for '
++                         'the known-scalar model trained by my_train.py, which predicts alpha-scaled '
++                         'sources (alpha ~ U[0.4, 0.6]).')
++parser.add_argument('--ngf', type=int, default=64,
++                    help='number of base filters in G (default: 64)')
++args = parser.parse_args()
++
++
++def tensor2im_correct(input_tensor, imtype=np.uint8):
++    """
++    Converts a Tensor in [0, 1] range into a numpy image array in [0, 255].
++
++    Parameters:
++        input_tensor (tensor) -- the input image tensor array in [0, 1] range
++        imtype (type)        -- the desired type of the converted numpy array
++    """
++    if isinstance(input_tensor, torch.Tensor):
++        image_tensor = input_tensor.data
++    else:
++        return input_tensor
++
++    # Clamp to [0, 1] range
++    image_numpy = image_tensor[0].clamp(0.0, 1.0).cpu().float().numpy()
++
++    # Handle grayscale
++    if image_numpy.shape[0] == 1:
++        image_numpy = np.tile(image_numpy, (3, 1, 1))
++
++    # Transpose from CHW to HWC and scale to [0, 255]
++    image_numpy = np.transpose(image_numpy, (1, 2, 0)) * 255.0
++
++    return image_numpy.astype(imtype)
++
++
++def save_image(image_numpy, image_path, aspect_ratio=1.0):
++    """
++    Save a numpy image to disk.
++
++    Parameters:
++        image_numpy (numpy array) -- input numpy array in [0, 255] range
++        image_path (str/Path)      -- the path of the image
++        aspect_ratio (float)       -- aspect ratio for resizing (not used here)
++    """
++    image_pil = Image.fromarray(image_numpy)
++    image_pil.save(image_path)
++
++
++def plot_alpha_map(alpha_map_tensor, title="Alpha Map"):
++    """
++    Plot alpha map as a grayscale heatmap.
++
++    Parameters:
++        alpha_map_tensor (tensor) -- alpha map tensor [H, W]
++        title (str)              -- title for the plot
++
++    Returns:
++        fig -- matplotlib figure
++    """
++    fig, ax = plt.subplots(1, figsize=(6, 6))
++
++    # Convert to numpy
++    if isinstance(alpha_map_tensor, torch.Tensor):
++        img = alpha_map_tensor.detach().cpu().numpy()
++    else:
++        img = alpha_map_tensor
++
++    # Plot with grayscale colormap
++    img_plot = ax.imshow(img, vmin=0, vmax=1, cmap='gray')
++    ax.set_title(f'{title}\nMin: {img.min():.3f}, Max: {img.max():.3f}')
++    plt.colorbar(img_plot, ax=ax)
++
++    return fig
++
++
++def save_json(file_path: Union[str, Path], data: Dict[str, Any]):
++    """Save dictionary as JSON file."""
++    with open(file_path, 'w') as fp:
++        json.dump(data, fp, indent=4)
++
++
++def load_model(args):
++    """Load the trained model from checkpoint."""
++    net_G = cycnet.define_G(
++        input_nc=3,
++        output_nc=6,
++        ngf=args.ngf,
++        netG=args.net_G,
++        use_dropout=False,
++        norm='none'
++    ).to(device)
++
++    print(f'Loading checkpoint from {args.ckptdir}...')
++    checkpoint_path = os.path.join(args.ckptdir, 'best_ckpt.pt')
++
++    if not os.path.exists(checkpoint_path):
++        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
++
++    checkpoint = torch.load(checkpoint_path)
++    net_G.load_state_dict(checkpoint['model_G_state_dict'])
++    net_G.to(device)
++    net_G.eval()
++
++    print(f'Model loaded successfully!')
++    print(f'  Best epoch: {checkpoint.get("best_epoch_id", "N/A")}')
++    print(f'  Best validation accuracy: {checkpoint.get("best_val_acc", "N/A"):.4f}')
++
++    return net_G
++
++
++class BIDDataset(Dataset):
++    """Dataset loader for BID dataset with CSV annotations."""
++
++    def __init__(self, csv_root, transform):
++        self.csv_root = Path(csv_root)
++        self.root = self.csv_root.parent
++        self.data = pd.read_csv(self.csv_root)
++        self.transform = transform
++
++        print(f'Loaded BID dataset from {csv_root}')
++        print(f'  Number of pairs: {len(self.data)}')
++
++    def __getitem__(self, index: int) -> Dict[str, Union[torch.Tensor, str]]:
++        pair = self.data.iloc[index]
++        image1_path = self.root / pair['img1_path']
++        image2_path = self.root / pair['img2_path']
++
++        # Load images and convert to tensors [0, 1]
++        image1 = self.transform(Image.open(image1_path).convert('RGB'))
++        image2 = self.transform(Image.open(image2_path).convert('RGB'))
++
++        # Get alpha ground truth coefficients
++        try:
++            if 'a' in pair.index:
++                alpha_gt = pair[['a', 'b', 'c', 'd', 'e', 'f']].values.tolist()
++            else:  # scalar manifests may store only 'alpha'
++                alpha_gt = [float(pair['alpha']), 0.0, 0.0, 0.0, 0.0, 0.0]
++        except:
++            alpha_gt = [0.5, 0, 0, 0, 0, 0]
++
++        return {
++            'image1': image1,
++            'image1_path': str(image1_path),
++            'image1_class': pair['img1_class'],
++            'image1_prompt': pair['img1_prompt'],
++            'image2': image2,
++            'image2_path': str(image2_path),
++            'image2_class': pair['img2_class'],
++            'image2_prompt': pair['img2_prompt'],
++            'index': index,
++            'alpha_gt': alpha_gt,
++            'pair_seeds': ast.literal_eval(pair['z_seeds']),
++            'pair_idx': index,
++        }
++
++    def __len__(self) -> int:
++        return len(self.data)
++
++
++def run_eval(args, net_G):
++    """Run evaluation on the dataset."""
++    print('Running evaluation...')
++    print(f'  Dataset: {args.dataset}')
++    print(f'  Output directory: {args.save_dir}')
++    print()
++
++    # Create dataset and dataloader
++    dataset = BIDDataset(csv_root=args.dataset, transform=ToTensor())
++    dataloader = DataLoader(
++        dataset=dataset,
++        batch_size=1,
++        shuffle=False,
++        num_workers=0,
++        pin_memory=True,
++        drop_last=False,
++    )
++
++    save_dir = Path(args.save_dir)
++    save_dir.mkdir(parents=True, exist_ok=True)
++
++    # Process each pair
++    for i, data in tqdm(enumerate(dataloader), total=len(dataloader), desc="Evaluating"):
++        pair_idx = data['pair_idx'].item()
++        pair_name = f"pair_{pair_idx:03d}/smp_0000"
++        save_path = save_dir / pair_name
++        save_path.mkdir(parents=True, exist_ok=True)
++
++        # Create alpha map from ground truth coefficients
++        alpha = get_alpha_map(
++            name='param_2d_order',
++            init_alpha=data['alpha_gt'],
++            device=device,
++            size=args.in_size,
++            alpha_min=0.0,
++            alpha_max=1.0,
++            requires_grad=False
++        )
++
++        # Get alpha map tensor [H, W]
++        alpha_map = alpha.forward()  # [H, W]
++
++        # Expand alpha to 3 channels for blending
++        alpha_3ch = alpha_map.unsqueeze(0).unsqueeze(0).expand(1, 3, -1, -1)  # [1, 3, H, W]
++
++        # Load images (already in [0, 1] range from ToTensor)
++        img1 = data['image1'].to(device)  # [1, 3, H, W]
++        img2 = data['image2'].to(device)  # [1, 3, H, W]
++
++        # Create ground truth blended image: alpha * img1 + (1-alpha) * img2
++        gt_blended = alpha_3ch * img1 + (1 - alpha_3ch) * img2
++
++        # Run model inference
++        with torch.no_grad():
++            out = net_G(gt_blended)
++            G_pred1 = out[:, 0:3, :, :]  # First 3 channels
++            G_pred2 = out[:, 3:6, :, :]  # Last 3 channels
++
++        # Clip predictions to [0, 1] (model may produce values slightly outside)
++        G_pred1 = torch.clamp(G_pred1, 0.0, args.clip_max) / args.clip_max
++        G_pred2 = torch.clamp(G_pred2, 0.0, args.clip_max) / args.clip_max
++
++        # Create sample blended from predictions
++        sample_blended = alpha_3ch * G_pred1 + (1 - alpha_3ch) * G_pred2
++
++        # Save images (convert from [0, 1] to [0, 255])
++        save_image(tensor2im_correct(G_pred1), save_path / 'sample1.png', aspect_ratio=1.0)
++        save_image(tensor2im_correct(G_pred2), save_path / 'sample2.png', aspect_ratio=1.0)
++        save_image(tensor2im_correct(gt_blended), save_path / 'blended_gt.png', aspect_ratio=1.0)
++        save_image(tensor2im_correct(sample_blended), save_path / 'blended_sample.png', aspect_ratio=1.0)
++        save_image(tensor2im_correct(img1), save_path / 'gt1.png', aspect_ratio=1.0)
++        save_image(tensor2im_correct(img2), save_path / 'gt2.png', aspect_ratio=1.0)
++
++        # Save details JSON
++        save_json(
++            save_path / 'details.json',
++            {
++                "image1_path": data['image1_path'][0],
++                "image1_class": data['image1_class'][0],
++                "image1_prompt": data['image1_prompt'][0],
++                "image2_path": data['image2_path'][0],
++                "image2_class": data['image2_class'][0],
++                "image2_prompt": data['image2_prompt'][0],
++                "sample1_path": str(save_path / 'sample1.png'),
++                "sample2_path": str(save_path / 'sample2.png'),
++                "gt1_path": str(save_path / 'gt1.png'),
++                "gt2_path": str(save_path / 'gt2.png'),
++                "blended_gt_path": str(save_path / 'blended_gt.png'),
++                "blended_sample_path": str(save_path / 'blended_sample.png'),
++                "pair_idx": pair_idx,
++            }
++        )
++
++        # Save alpha parameters
++        alpha_temp = {
++            "type": "param_2d_order",
++            "parameters": [float(t.item()) for t in alpha.get_scaled_parameters()],
++            "raw_parameters": [float(t.item()) for t in alpha.get_parameters()],
++            "init_parameters": [float(t.item()) for t in alpha.init_alpha],
++        }
++
++        save_json(
++            save_path / 'alphas.json',
++            {
++                "pred": alpha_temp,  # For now, same as GT (no alpha prediction)
++                "gt": alpha_temp,
++                "init_pred_map": alpha_temp
++            }
++        )
++
++        # Save alpha map visualizations
++        alpha_fig = plot_alpha_map(alpha_map, title="Ground Truth Alpha Map")
++        alpha_fig.savefig(save_path / 'gt_map.png', dpi=150, bbox_inches='tight')
++        alpha_fig.savefig(save_path / 'pred_map.png', dpi=150, bbox_inches='tight')  # Same as GT for now
++        plt.close(alpha_fig)
++
++    print(f'\nEvaluation complete! Results saved to: {save_dir}')
++    print(f'Processed {len(dataloader)} image pairs.')
++
++
++if __name__ == '__main__':
++    # Load model
++    net_G = load_model(args)
++
++    # Run evaluation
++    run_eval(args, net_G)
+diff --git a/alpha_train.py b/alpha_train.py
+new file mode 100644
+index 0000000..cfacb44
+--- /dev/null
++++ b/alpha_train.py
+@@ -0,0 +1,293 @@
++from pathlib import Path
++import argparse
++import os
++import numpy as np
++import matplotlib.pyplot as plt
++
++from torch.utils.data import DataLoader
++
++from alpha_dataset import AlphaBlendingDataset
++import unmix_gan as um
++import torch
++
++# settings
++def get_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser(description='DAD Training with Alpha-based Blending')
++
++    # Dataset args
++    parser.add_argument('--data_path', type=str, required=True,
++                        help="Path to the dataset root folder with trainA and trainB")
++    parser.add_argument('--img_size', type=int, default=256,
++                        help='Image size for training (default: 256)')
++
++    # Alpha blending args
++    parser.add_argument('--alpha_mode', type=str, default='scalar',
++                        choices=['scalar', 'spatial'],
++                        help='Alpha mode: scalar for constant alpha, spatial for polynomial map (default: scalar)')
++    parser.add_argument('--alpha_min', type=float, default=0.4,
++                        help='Minimum alpha value (default: 0.4)')
++    parser.add_argument('--alpha_max', type=float, default=0.6,
++                        help='Maximum alpha value (default: 0.6)')
++
++    # Model args
++    parser.add_argument('--net_G', type=str, default='unet_128', metavar='str',
++                        help='net_G: unet_512, unet_256 or unet_128 or unet_64 (default: unet_128)')
++    parser.add_argument('--ngf', type=int, default=64, metavar='N',
++                        help='number of base filters in G')
++    parser.add_argument('--batch_size', type=int, default=4, metavar='N',
++                        help='input batch size for training (default: 4)')
++
++    # Loss args
++    parser.add_argument('--pixel_loss', type=str, default='minimum_pixel_loss', metavar='str',
++                        help='type of pixel loss from [minimum_pixel_loss, pixel_loss] (default: minimum_pixel_loss)')
++    parser.add_argument('--enable_d1d2', action='store_true', default=False,
++                        help='improve the G by adversarial training with D1/D2')
++    parser.add_argument('--enable_d3', action='store_true', default=False,
++                        help='improve the G by adversarial training with D3')
++    parser.add_argument('--enable_synfake', action='store_true', default=False,
++                        help='to use synfake sample for training D')
++    parser.add_argument('--enable_exclusion_loss', action='store_true', default=False,
++                        help='improve the G by using exclusion loss')
++    parser.add_argument('--enable_kurtosis_loss', action='store_true', default=False,
++                        help='improve the G by using kurtosis loss')
++
++    # Training args
++    parser.add_argument('--lr', type=float, default=1e-4,
++                        help='learning rate (default: 0.0001)')
++    parser.add_argument('--exp_lr_scheduler_stepsize', type=int, default=100,
++                        help='every m steps to exponentially reduce lr to 0.1x')
++    parser.add_argument('--max_num_epochs', type=int, default=200, metavar='N',
++                        help='max number of training epochs (default 200)')
++    parser.add_argument('--lambda_L1', type=float, default=1,
++                        help='coefficient on L1 loss to balance with other losses')
++    parser.add_argument('--lambda_adv', type=float, default=1e-4,
++                        help='coefficient on adv loss to balance with other losses')
++
++    # Output args
++    parser.add_argument('--output_dir', type=str,
++                        default=r'./outputs_alpha', metavar='str',
++                        help='root dir for all outputs (default: ./outputs_alpha)')
++    parser.add_argument('--save_samples_every', type=int, default=1000,
++                        help='save samples every N iterations (default: 1000)')
++
++    # Metric args
++    parser.add_argument('--metric', type=str, default='mse',
++                        help='metric to update ckpt, from [psnr, ssim, mse, psnr_gt1, ssim_gt1, labrmse_gt1] (default: mse)')
++    parser.add_argument('--output_auto_enhance', action='store_true', default=False,
++                        help='to enhance the output images')
++    parser.add_argument('--print_models', action='store_true', default=False,
++                        help='visualize and print networks')
++
++    return parser.parse_args()
++
++
++def save_sample_images(batch, G_pred1, G_pred2, save_dir, step, device):
++    """
++    Save samples in the GIP_v2 format:
++    - {step}_alpha_map.png
++    - {step}_gt_X1.png
++    - {step}_gt_X2.png
++    - {step}_input_Y.png
++    - {step}_predicted_X2.png
++    - {step}_recovered_X1.png
++    """
++    os.makedirs(save_dir, exist_ok=True)
++
++    # Take the first sample from the batch
++    input_Y = batch['input'][0].cpu().detach().numpy().transpose(1, 2, 0)  # [H, W, 3]
++    gt_X1 = batch['gt1'][0].cpu().detach().numpy().transpose(1, 2, 0)
++    gt_X2 = batch['gt2'][0].cpu().detach().numpy().transpose(1, 2, 0)
++    alpha_map = batch['alpha_map'][0].cpu().detach().numpy()  # [H, W]
++
++    predicted_X2 = G_pred2[0].cpu().detach().numpy().transpose(1, 2, 0)
++    predicted_X1 = G_pred1[0].cpu().detach().numpy().transpose(1, 2, 0)
++
++    # Clip predictions to [0, 1] range (model output can exceed this range during training)
++    # Ground truth and input are already in [0, 1] range from the dataset
++    predicted_X1 = np.clip(predicted_X1, 0, 1)
++    predicted_X2 = np.clip(predicted_X2, 0, 1)
++
++    # Save images
++    plt.imsave(os.path.join(save_dir, f'{step:06d}_input_Y.png'), input_Y)
++    plt.imsave(os.path.join(save_dir, f'{step:06d}_gt_X1.png'), gt_X1)
++    plt.imsave(os.path.join(save_dir, f'{step:06d}_gt_X2.png'), gt_X2)
++    plt.imsave(os.path.join(save_dir, f'{step:06d}_predicted_X2.png'), predicted_X2)
++    plt.imsave(os.path.join(save_dir, f'{step:06d}_recovered_X1.png'), predicted_X1)
++
++    # Save alpha map as grayscale heatmap
++    plt.imsave(os.path.join(save_dir, f'{step:06d}_alpha_map.png'),
++               alpha_map, cmap='gray', vmin=0, vmax=1)
++
++
++class UnmixGANWithSampling(um.UnmixGAN):
++    """Extended UnmixGAN class that saves samples during training"""
++
++    def __init__(self, args, dataloaders, samples_dir, save_samples_every):
++        super().__init__(args, dataloaders)
++        self.samples_dir = samples_dir
++        self.save_samples_every = save_samples_every
++        self.global_step = 0
++
++        # Create samples directory
++        os.makedirs(self.samples_dir, exist_ok=True)
++
++    def _compute_acc(self):
++        """Override to add MSE metric support"""
++        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
++
++        target1 = self.batch['gt1'].to(device).detach()
++        target2 = self.batch['gt2'].to(device).detach()
++        img1 = self.G_pred1.detach()
++        img2 = self.G_pred2.detach()
++
++        if self.metric == 'mse':
++            # MSE for both predictions (lower is better)
++            mse1 = torch.mean((img1 - target1) ** 2) + torch.mean((img2 - target2) ** 2)
++            mse2 = torch.mean((img1 - target2) ** 2) + torch.mean((img2 - target1) ** 2)
++            return torch.min(mse1, mse2)  # Return minimum MSE (best assignment)
++        else:
++            # Use parent class implementation for other metrics
++            return super()._compute_acc()
++
++    def _update_checkpoints(self):
++        """Override to handle MSE metric (lower is better)"""
++        # save current model
++        self._save_checkpoint(ckpt_name='last_ckpt.pt')
++        print('Latest model updated. Epoch_acc=%.4f, Historical_best_acc=%.4f (at epoch %d)'
++              % (self.epoch_acc, self.best_val_acc, self.best_epoch_id))
++        print()
++
++        # update the best model (based on eval acc)
++        if self.metric in ['mse', 'labrmse_gt1']:
++            # Lower score is better
++            if self.epoch_acc < self.best_val_acc:
++                self.best_val_acc = self.epoch_acc
++                self.best_epoch_id = self.epoch_id
++                self._save_checkpoint(ckpt_name='best_ckpt.pt')
++                print('*' * 10 + 'Best model updated!')
++                print()
++        else:
++            # Higher score is better (PSNR, SSIM)
++            if self.epoch_acc > self.best_val_acc:
++                self.best_val_acc = self.epoch_acc
++                self.best_epoch_id = self.epoch_id
++                self._save_checkpoint(ckpt_name='best_ckpt.pt')
++                print('*' * 10 + 'Best model updated!')
++                print()
++
++    def _collect_running_batch_states(self):
++        """Override to add sample saving"""
++        self.running_acc.append(self._compute_acc().item())
++
++        m = len(self.dataloaders['train'])
++        if self.is_training is False:
++            m = len(self.dataloaders['val'])
++
++        if np.mod(self.batch_id, 100) == 1 or self.batch_id == m-1:
++            print('Is_training: %s. [%d,%d][%d,%d], G_loss: %.8f, D_loss: %.8f, running_acc: %.8f (%s),'
++                  % (self.is_training, self.epoch_id, self.max_num_epochs-1, self.batch_id, m,
++                     self.G_loss.item(), self.D_loss.item(),
++                     np.mean(self.running_acc), self.metric))
++
++        # Save samples during validation
++        if not self.is_training and (np.mod(self.batch_id, 10) == 0 or self.batch_id == m-1):
++            step = self.epoch_id * 1000 + self.batch_id  # Unique step identifier
++            save_sample_images(
++                self.batch, self.G_pred1, self.G_pred2,
++                self.samples_dir, step, torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
++            )
++
++        # Original visualization
++        if np.mod(self.batch_id, 1000) == 1 or self.batch_id == m-1:
++            vis_input = um.utils.make_numpy_grid(self.batch['input'])
++            vis_pred1 = um.utils.make_numpy_grid(self.G_pred1)
++            vis_pred2 = um.utils.make_numpy_grid(self.G_pred2)
++
++            # Images are already in [0, 1] range (unlike original DAD which uses [0, 0.5])
++            if self.output_auto_enhance:
++                vis_pred1 = vis_pred1 * 1.5
++                vis_pred2 = vis_pred2 * 1.5
++
++            vis = np.concatenate([vis_input, vis_pred1, vis_pred2], axis=0)
++            vis = np.clip(vis, a_min=0.0, a_max=1.0)
++            file_name = os.path.join(
++                self.vis_dir, 'istrain_'+str(self.is_training)+'_'+
++                              str(self.epoch_id)+'_'+str(self.batch_id)+'.jpg')
++            plt.imsave(file_name, vis)
++
++
++if __name__ == '__main__':
++    args = get_args()
++    data_path = Path(args.data_path)
++
++    # Create output directory structure
++    output_path = Path(args.output_dir)
++    args.checkpoint_dir = str(output_path / 'checkpoints')
++    args.vis_dir = str(output_path / 'val')
++    args.samples_dir = str(output_path / 'samples')
++
++    # Create directories
++    os.makedirs(args.checkpoint_dir, exist_ok=True)
++    os.makedirs(args.vis_dir, exist_ok=True)
++    os.makedirs(args.samples_dir, exist_ok=True)
++
++    print(f"Training Configuration:")
++    print(f"  Dataset: {args.data_path}")
++    print(f"  Alpha mode: {args.alpha_mode}")
++    print(f"  Alpha range: [{args.alpha_min}, {args.alpha_max}]")
++    print(f"  Image size: {args.img_size}")
++    print(f"  Batch size: {args.batch_size}")
++    print(f"  Metric: {args.metric}")
++    print(f"  Output dir: {args.output_dir}")
++    print(f"    - Checkpoints: {args.checkpoint_dir}")
++    print(f"    - Validation: {args.vis_dir}")
++    print(f"    - Samples: {args.samples_dir}")
++    print()
++
++    # Create datasets with alpha-based blending
++    datasets = {
++        'train': AlphaBlendingDataset(
++            root_dir_1=data_path / 'trainA',
++            root_dir_2=data_path / 'trainB',
++            img_size=args.img_size,
++            alpha_mode=args.alpha_mode,
++            alpha_min=args.alpha_min,
++            alpha_max=args.alpha_max,
++            suff='.jpg',
++            is_train=True
++        ),
++        'val': AlphaBlendingDataset(
++            root_dir_1=data_path / 'trainA',
++            root_dir_2=data_path / 'trainB',
++            img_size=args.img_size,
++            alpha_mode=args.alpha_mode,
++            alpha_min=args.alpha_min,
++            alpha_max=args.alpha_max,
++            suff='.jpg',
++            is_train=False
++        ),
++    }
++
++    dataloaders = {
++        x: DataLoader(datasets[x],
++                      batch_size=args.batch_size,
++                      shuffle=True,
++                      num_workers=8)
++        for x in ['train', 'val']
++    }
++
++    print(f"Dataset sizes:")
++    print(f"  Train: {len(datasets['train'])} samples")
++    print(f"  Val: {len(datasets['val'])} samples")
++    print()
++
++    # Create trainer with sample saving
++    unmix = UnmixGANWithSampling(
++        args=args,
++        dataloaders=dataloaders,
++        samples_dir=args.samples_dir,
++        save_samples_every=args.save_samples_every
++    )
++
++    # Train the model
++    unmix.train_models()
+diff --git a/alphas/alpha_maps/__init__.py b/alphas/alpha_maps/__init__.py
+new file mode 100644
+index 0000000..c536962
+--- /dev/null
++++ b/alphas/alpha_maps/__init__.py
+@@ -0,0 +1,3 @@
++from .base import *
++from .params import *
++from .registry import  *
+diff --git a/alphas/alpha_maps/base.py b/alphas/alpha_maps/base.py
+new file mode 100644
+index 0000000..6de0e5d
+--- /dev/null
++++ b/alphas/alpha_maps/base.py
+@@ -0,0 +1,115 @@
++from abc import ABC, abstractmethod
++from typing import (Optional,
++                    Union,
++                    List,
++                    )
++import torch
++import torch.nn.functional as F
++
++class AlphaMap(ABC):
++    """Base class for all alpha maps."""
++
++    def __init__(self,
++                 map_type: str,
++                 size: int = 256,
++                 device = 'cuda',
++                 alpha_min: float = 0.0,
++                 alpha_max: float = 1.0,
++                 init_alpha: Optional[Union[List[float], float]] = None,
++                 requires_grad: bool = False,
++                 ):
++        self.map_type = map_type
++        self.size = (size, size)
++        self.device = device
++        self.alpha_min = alpha_min
++        self.alpha_max = alpha_max
++        self.min_slope = alpha_max - alpha_min
++        self.init_alpha = init_alpha
++        self.requires_grad = requires_grad
++        self.init_params = None
++        self.initialized = False
++        self._initialize_parameters()
++
++    def tanh(self, img):
++        return 0.5 * F.tanh(img) + 0.5
++
++    @abstractmethod
++    def _initialize_parameters(self):
++        """Initialize map-specific parameters."""
++        pass
++
++    @abstractmethod
++    def forward(self):
++        """Generate the alpha map from current parameters."""
++        pass
++
++    @abstractmethod
++    def get_parameters(self):
++        """Return list of parameters that can be optimized."""
++        pass
++
++    def get_smoothness_loss(self, weight=1e-3):
++        """
++        Default smoothness loss for non-spatial alpha maps.
++        Returns zero loss to maintain compatibility.
++
++        Args:
++            weight: Regularization weight (ignored for non-spatial maps)
++
++        Returns:
++            Zero tensor for compatibility
++        """
++        # Return zero loss for polynomial-based alpha maps
++        # Only spatial maps will override this with actual smoothness computation
++        return torch.tensor(0.0, device=self.device, requires_grad=False)
++
++    def __call__(self):
++        """Allow using instance as a callable."""
++        return self.forward()
++
++    def sum(self):
++        return self.forward().sum()
++
++    def mean(self):
++        return self.forward().mean()
++
++    # Basic arithmetic operations
++    def __add__(self, other): return self.forward() + other
++
++    def __radd__(self, other): return other + self.forward()
++
++    def __sub__(self, other): return self.forward() - other
++
++    def __rsub__(self, other): return other - self.forward()
++
++    def __mul__(self, other): return self.forward() * other
++
++    def __rmul__(self, other): return other * self.forward()
++
++    def __truediv__(self, other): return self.forward() / other
++
++    def __rtruediv__(self, other): return other / self.forward()
++
++    # Comparison operations
++    def __lt__(self, other): return self.forward() < other
++
++    def __le__(self, other): return self.forward() <= other
++
++    def __gt__(self, other): return self.forward() > other
++
++    def __ge__(self, other): return self.forward() >= other
++
++    def __eq__(self, other): return self.forward() == other
++
++    def __ne__(self, other): return self.forward() != other
++
++    # Power operations
++    def __pow__(self, other): return self.forward() ** other
++
++    def __rpow__(self, other): return other ** self.forward()
++
++    # Absolute value
++    def __abs__(self): return abs(self.forward())
++
++    # Negation
++    def __neg__(self): return -self.forward()
+diff --git a/alphas/alpha_maps/params.py b/alphas/alpha_maps/params.py
+new file mode 100644
+index 0000000..6183975
+--- /dev/null
++++ b/alphas/alpha_maps/params.py
+@@ -0,0 +1,252 @@
++import math
++import random
++
++import torch
++
++from .base import AlphaMap
++from .registry import register_alpha_map
++
++
++@register_alpha_map('param_2d_order')
++class ParamSecondOrderMap(AlphaMap):
++    def _initialize_parameters(self):
++        if self.init_alpha:
++            a_t, b_t, c_t, d_t, e_t, f_t = self.init_alpha
++        else:
++            a_t = random.uniform(self.alpha_min, self.alpha_max)
++            b_t = random.uniform(self.alpha_min - a_t, self.alpha_max - a_t)
++            e_t = random.uniform(self.alpha_min - (a_t + b_t),
++                                 self.alpha_max - (a_t + b_t))
++            c_t = random.uniform(self.alpha_min - a_t, self.alpha_max - a_t)
++            f_t = random.uniform(self.alpha_min - (a_t + c_t),
++                                 self.alpha_max - (a_t + c_t))
++            d_t = random.uniform(
++                self.alpha_min - (a_t + b_t + c_t + e_t + f_t),
++                self.alpha_max - (a_t + b_t + c_t + e_t + f_t))
++
++        a = math.atanh(2 * ((a_t - self.alpha_min) / self.min_slope - 0.5))
++        b = math.atanh(
++            2 * ((b_t - (self.alpha_min - a_t)) / self.min_slope - 0.5))
++        e = math.atanh(2 * (
++                ((e_t + (a_t + b_t)) - self.alpha_min) / self.min_slope - 0.5))
++        c = math.atanh(
++            2 * ((c_t - (self.alpha_min - a_t)) / self.min_slope - 0.5))
++        f = math.atanh(2 * (
++                ((f_t + (a_t + c_t)) - self.alpha_min) / self.min_slope - 0.5))
++        d = math.atanh(2 * (((d_t + (
++                a_t + b_t + c_t + e_t + f_t)) - self.alpha_min) /
++                            self.min_slope - 0.5))
++
++        self.a = torch.tensor(a, device=self.device).requires_grad_(self.requires_grad)
++        self.b = torch.tensor(b, device=self.device).requires_grad_(self.requires_grad)
++        self.c = torch.tensor(c, device=self.device).requires_grad_(self.requires_grad)
++        self.d = torch.tensor(d, device=self.device).requires_grad_(self.requires_grad)
++        self.e = torch.tensor(e, device=self.device).requires_grad_(self.requires_grad)
++        self.f = torch.tensor(f, device=self.device).requires_grad_(self.requires_grad)
++
++        # Create coordinate grid for evaluation
++        img_range_x = torch.arange(self.size[1], device=self.device)
++        img_range_y = torch.arange(self.size[0], device=self.device)
++        self.Y, self.X = torch.meshgrid(img_range_y, img_range_x,
++                                        indexing='ij')
++        self.pixels = self.forward()
++        self.init_params = [p.clone().detach() for p in
++                            self.get_scaled_parameters()]
++
++    def get_parameters(self):
++        return [self.a, self.b, self.c, self.d, self.e, self.f]
++
++    def get_scaled_parameters(self):
++        self.calc_tanh()
++        return [self.tanh_a, self.tanh_b, self.tanh_c, self.tanh_d,
++                self.tanh_e, self.tanh_f]
++
++    def calc_tanh(self):
++
++        self.tanh_a = self.min_slope * self.tanh(self.a) + self.alpha_min
++        self.tanh_b = (
++                              self.alpha_min - self.tanh_a) + self.min_slope\
++                      * self.tanh(
++            self.b)
++        self.tanh_e = (self.alpha_min - (
++                self.tanh_a + self.tanh_b)) + self.min_slope * self.tanh(
++            self.e)
++        self.tanh_c = (
++                              self.alpha_min - self.tanh_a) + self.min_slope * self.tanh(
++            self.c)
++        self.tanh_f = (self.alpha_min - (
++                self.tanh_a + self.tanh_c)) + self.min_slope * self.tanh(
++            self.f)
++        total_base = self.tanh_a + self.tanh_b + self.tanh_c + self.tanh_e + self.tanh_f
++        self.tanh_d = (
++                              self.alpha_min - total_base) + self.min_slope * self.tanh(
++            self.d)
++
++    def forward(self):
++        self.calc_tanh()
++        # Normalize coordinates to [0, 1]
++        X_norm = self.X / (self.size[1] - 1)
++        Y_norm = self.Y / (self.size[0] - 1)
++        self.pixels = (
++                self.tanh_a + self.tanh_b * X_norm + self.tanh_c * Y_norm + self.tanh_d * X_norm * Y_norm + self.tanh_e * (
++                X_norm**2) + self.tanh_f * (Y_norm**2))
++        return self.pixels
++
++    def __str__(self):
++        a, b, c, d, e, f = self.get_scaled_parameters()
++        return f'α(X,Y) = {a:.02} + {b:.02}X + {c:.02}Y + {d:.02}XY + {e:.02}X² + {f:.02}Y²'
++
++
++@register_alpha_map('param_spatial_full')
++class ParamSpatialFullMap(AlphaMap):
++    """
++    Full spatial resolution alpha map with HxW parameters.
++    Initialized using the same logic as ParamSecondOrderMap but optimizes every pixel independently.
++    """
++
++    def _initialize_parameters(self):
++        if self.init_alpha is None:
++            # Random initialization using polynomial
++            self._initialize_from_polynomial()
++        elif isinstance(self.init_alpha, list):
++            if len(self.init_alpha) == 6:
++                # List of 6 polynomial coefficients - initialize from polynomial
++                self._initialize_from_polynomial()
++            else:
++                # Assume it's a spatial map (nested list HxW)
++                self._initialize_from_spatial_map()
++        else:
++            raise ValueError(f"Unsupported init_alpha format: {type(self.init_alpha)}")
++
++        # Store initial state and compute initial pixels
++        self.pixels = self.forward()
++        self.init_params = [self.alpha_params.clone().detach()]
++
++    def _initialize_from_polynomial(self):
++        """Initialize from 6 polynomial coefficients using ParamSecondOrderMap."""
++        # Store original init_alpha for saving
++        self._original_init_alpha = self.init_alpha
++
++        # Create temporary 2nd-order map with same initialization parameters
++        temp_poly_map = ParamSecondOrderMap(
++            map_type='param_2d_order',
++            size=self.size[0],  # assuming square
++            device=self.device,
++            alpha_min=self.alpha_min,
++            alpha_max=self.alpha_max,
++            init_alpha=self.init_alpha,
++            requires_grad=False  # we don't need gradients for initialization
++        )
++
++        # Get the evaluated polynomial as our starting alpha map
++        initial_alpha_map = temp_poly_map.forward()  # Shape: (H, W)
++
++        # Convert to unconstrained parameters
++        self._convert_alpha_map_to_params(initial_alpha_map)
++
++    def _initialize_from_spatial_map(self):
++        """Initialize from loaded spatial alpha map (constrained values)."""
++        # Convert nested list to tensor
++        if isinstance(self.init_alpha[0], list):
++            # Nested list [[row1], [row2], ...]
++            alpha_map = torch.tensor(self.init_alpha, device=self.device, dtype=torch.float32)
++        else:
++            # Flattened list - reshape to spatial dimensions
++            alpha_map = torch.tensor(self.init_alpha, device=self.device, dtype=torch.float32)
++            alpha_map = alpha_map.reshape(self.size)
++
++        # Convert to unconstrained parameters
++        self._convert_alpha_map_to_params(alpha_map)
++
++    def _convert_alpha_map_to_params(self, alpha_map):
++        """Convert constrained alpha map to unconstrained parameters."""
++        # Reverse the tanh transformation: alpha -> unconstrained
++        # alpha = alpha_min + min_slope * (0.5 * tanh(x) + 0.5)
++        # Solving for x: x = atanh(2 * ((alpha - alpha_min) / min_slope) - 1)
++        normalized_alpha = (alpha_map - self.alpha_min) / self.min_slope  # [0, 1]
++        tanh_input = 2 * normalized_alpha - 1  # [-1, 1]
++        # Clamp to avoid numerical issues with atanh
++        tanh_input = torch.clamp(tanh_input, -0.999, 0.999)
++        unconstrained_init = torch.atanh(tanh_input)
++
++        # Create the learnable HxW parameter tensor
++        self.alpha_params = torch.tensor(unconstrained_init, device=self.device).requires_grad_(self.requires_grad)
++
++    def get_parameters(self):
++        """Return the full spatial parameter tensor."""
++        return [self.alpha_params]
++
++    def get_scaled_parameters(self):
++        """Return the constrained alpha values."""
++        self.calc_tanh()
++        return [self.tanh_alpha]
++
++    def calc_tanh(self):
++        """Convert unconstrained parameters to valid alpha values [alpha_min, alpha_max]."""
++        # Follow the same pattern as other alpha maps
++        self.tanh_alpha = self.min_slope * self.tanh(self.alpha_params) + self.alpha_min
++
++    def forward(self):
++        """Generate the alpha map from current parameters."""
++        self.calc_tanh()
++        self.pixels = self.tanh_alpha
++        return self.pixels
++
++    def get_scale_functions(self):
++        """Return functions to convert from constrained to unconstrained space."""
++
++        # For compatibility - though less meaningful for spatial maps
++        def inverse_transform(alpha_tensor):
++            normalized = (alpha_tensor - self.alpha_min) / self.min_slope
++            tanh_input = torch.clamp(2 * normalized - 1, -0.999, 0.999)
++            return torch.atanh(tanh_input)
++
++        return [inverse_transform]
++
++    def get_save_parameters(self):
++        """Get parameters in format compatible with JSON saving."""
++        # Return the constrained alpha map as nested list for JSON
++        alpha_map = self.forward()  # Get constrained values
++        return alpha_map.detach().cpu().tolist()  # Convert to nested list
++
++    def get_save_raw_parameters(self):
++        """Get raw (unconstrained) parameters for JSON saving."""
++        return self.alpha_params.detach().cpu().tolist()
++
++    def get_save_init_parameters(self):
++        """Get initial parameters for JSON saving."""
++        if hasattr(self, '_original_init_alpha') and self._original_init_alpha is not None:
++            return self._original_init_alpha
++        else:
++            # If initialized from spatial map, return the initial map
++            return self.init_params[0].detach().cpu().tolist()
++
++    def get_smoothness_loss(self, weight=100000.0):
++        """
++        Compute Laplacian smoothness regularization loss on the alpha map.
++        This penalizes second derivatives and encourages polynomial-like behavior.
++
++        Args:
++            weight: Regularization weight (default: 1e-1)
++
++        Returns:
++            Smoothness loss tensor
++        """
++        alpha_map = self.forward()  # Get constrained alpha map
++
++        # Compute discrete Laplacian: ∇²α = α[i+1,j] + α[i-1,j] + α[i,j+1] + α[i,j-1] - 4α[i,j]
++        padded = torch.nn.functional.pad(alpha_map, (1, 1, 1, 1), mode='constant', value=0)
++
++        laplacian = (padded[2:, 1:-1] +  # α[i+1,j]
++                     padded[:-2, 1:-1] +  # α[i-1,j]
++                     padded[1:-1, 2:] +  # α[i,j+1]
++                     padded[1:-1, :-2] -  # α[i,j-1]
++                     4 * alpha_map)  # -4α[i,j]
++
++        return weight * laplacian.pow(2).mean()
++
++    def __str__(self):
++        """String representation showing the spatial dimensions."""
++        num_params = self.alpha_params.numel()
++        memory_mb = num_params * 4 / (1024 * 1024)  # 4 bytes per float32
++        return f'α(X,Y) = Spatial[{self.size[0]}×{self.size[1]}]'
+\ No newline at end of file
+diff --git a/alphas/alpha_maps/registry.py b/alphas/alpha_maps/registry.py
+new file mode 100644
+index 0000000..c989b90
+--- /dev/null
++++ b/alphas/alpha_maps/registry.py
+@@ -0,0 +1,19 @@
++__ALPHA_MAPS__ = {}
++
++def register_alpha_map(name: str):
++    def wrapper(cls):
++        if __ALPHA_MAPS__.get(name, None):
++            raise NameError(f"Name { name} is already registered!")
++        __ALPHA_MAPS__[name] = cls
++        return cls
++    return wrapper
++
++
++def get_alpha_map(name: str, **kwargs):
++    if __ALPHA_MAPS__.get(name, None) is None:
++        raise NameError(f"Name {name} is not defined!")
++    return __ALPHA_MAPS__[name](map_type=name, **kwargs)
++
++
++def get_alpha_map_types():
++    return list(__ALPHA_MAPS__.keys())
+\ No newline at end of file
+diff --git a/my_train.py b/my_train.py
+new file mode 100644
+index 0000000..43a9128
+--- /dev/null
++++ b/my_train.py
+@@ -0,0 +1,91 @@
++from pathlib import Path
++import argparse
++
++from torch.utils.data import  DataLoader
++
++from utils import TwoFoldersUnmixDataset
++import unmix_gan as um
++
++# settings
++def get_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser(description='ZZX UNMIXING')
++    parser.add_argument('--data_path', type=str,
++                        help="Path to the BID root dataset folder")
++    parser.add_argument('--net_G', type=str, default='unet_128', metavar='str',
++                        help='net_G: unet_512, unet_256 or unet_128 or unet_64 (default: unet_128)')
++    parser.add_argument('--ngf', type=int, default=64, metavar='N',
++                        help='number of base filters in G')
++    parser.add_argument('--batch_size', type=int, default=4, metavar='N',
++                        help='input batch size for training (default: 4)')
++    parser.add_argument('--pixel_loss', type=str, default='minimum_pixel_loss', metavar='str',
++                        help='type of pixel loss from [minimum_pixel_loss, pixel_loss] (default: minimum_pixel_loss)')
++    parser.add_argument('--print_models', action='store_true', default=False,
++                        help='visualize and print networks')
++    parser.add_argument('--checkpoint_dir', type=str, default=r'./checkpoints', metavar='str',
++                        help='dir to save checkpoints (default: ./checkpoints)')
++    parser.add_argument('--vis_dir', type=str, default=r'./val_out', metavar='str',
++                        help='dir to save results during training (default: ./val_out)')
++    parser.add_argument('--enable_d1d2', action='store_true', default=False,
++                        help='imporve the G by adversarial training')
++    parser.add_argument('--enable_d3', action='store_true', default=False,
++                        help='imporve the G by adversarial training')
++    parser.add_argument('--enable_synfake', action='store_true', default=False,
++                        help='to use synfake sample for training D')
++    parser.add_argument('--enable_exclusion_loss', action='store_true', default=False,
++                        help='imporve the G by using exclusion loss')
++    parser.add_argument('--enable_kurtosis_loss', action='store_true', default=False,
++                        help='imporve the G by using kurtosis loss')
++    parser.add_argument('--lr', type=float, default=1e-4,
++                        help='learning rate (default: 0.0001)')
++    parser.add_argument('--exp_lr_scheduler_stepsize', type=int, default=100,
++                        help='every m steps to expositionally reduce lr to 0.1x')
++    parser.add_argument('--max_num_epochs', type=int, default=200, metavar='N',
++                        help='max number of training epochs (default 200)')
++    parser.add_argument('--lambda_L1', type=float, default=1,
++                        help='coefficient on L1 loss to balance with other losses')
++    parser.add_argument('--lambda_adv', type=float, default=1e-4,
++                        help='coefficient on adv loss to balance with other losses')
++    parser.add_argument('--output_auto_enhance', action='store_true', default=False,
++                        help='to enhance the output images')
++    parser.add_argument('--mix_mode', type=str, default='linear',
++                        help='mode for generating mixed images, from [linear, nonlinear] (default: linear) ')
++    parser.add_argument('--metric', type=str, default='psnr',
++                        help='metric to update ckpt, from [psnr, ssim, psnr_gt1, ssim_gt1, labrmse_gt1] (default: psnr)')
++    return parser.parse_args()
++
++
++if __name__ == '__main__':
++
++    args = get_args()
++    data_path = Path(args.data_path)
++
++    datasets = {
++        'train': TwoFoldersUnmixDataset(root_dir_1=data_path / 'trainA',
++                                        root_dir_2=data_path / 'trainB',
++                                        img_size=256,
++                                        mix_mode=args.mix_mode,
++                                        suff='.jpg',
++                                        is_train=True),
++
++        'val': TwoFoldersUnmixDataset(root_dir_1=data_path / 'trainA',
++                                      root_dir_2=data_path / 'trainB',
++                                      img_size=256,
++                                      mix_mode=args.mix_mode,
++                                      suff='.jpg',
++                                      is_train=False),
++    }
++    dataloaders = {
++        x: DataLoader(datasets[x],
++                      batch_size=args.batch_size,
++                      shuffle=True,
++                      num_workers=8)
++        for x in ['train', 'val']
++    }
++
++
++    unmix = um.UnmixGAN(args=args,
++                        dataloaders=dataloaders)
++    unmix.train_models()
++
++
++
+diff --git a/utils.py b/utils.py
+index a14850c..5b7bbc2 100644
+--- a/utils.py
++++ b/utils.py
+@@ -4,7 +4,7 @@ import cv2
+ import os
+ import glob
+ import random
+-from skimage.measure import compare_ssim as sk_cpt_ssim
++from skimage.metrics import structural_similarity as sk_cpt_ssim
+ import scipy.stats as st
+ import skimage.color as skcolor
+ 
+@@ -1057,7 +1057,7 @@ def make_numpy_grid(tensor_data, enhance=False):
+     vis = np.array(vis.cpu()).transpose((1,2,0))
+     return vis
+ 
+-
++#### Original clip_01
+ def clip_01(x):
+     x[x>1.0] = 1.0
+     x[x<0] = 0
+@@ -1088,7 +1088,7 @@ def cpt_rgb_ssim(img, img_gt):
+     for i in range(3):
+         tmp = img[:, :, i]
+         tmp_gt = img_gt[:, :, i]
+-        ssim = sk_cpt_ssim(tmp, tmp_gt)
++        ssim = sk_cpt_ssim(tmp, tmp_gt, data_range=1.0)
+         SSIM = SSIM + ssim
+     return SSIM / 3.0
+ 
