@@ -1,0 +1,19 @@
+{
+  "model_id": "Qwen/Qwen2-VL-7B-Instruct",
+  "model_revision": "eed13092ef92e448dd6875b2a00151bd3f7db0ac",
+  "instruction": "This image is an alpha-blend (like a double exposure) of two different photographs overlaid on each other. Identify the two underlying scenes. Answer with exactly two lines:\n1. <one sentence describing only the first photo's content>\n2. <one sentence describing only the second photo's content>\nDo not mention the blend, overlay, or the other photo in either sentence.",
+  "decoding": {
+    "do_sample": false,
+    "max_new_tokens": 128
+  },
+  "input_csv": "manifests/comparison/dataset_random_alpha_map.csv",
+  "input_csv_sha256": "716e7457361dea180453f2c282ebe3210cda12c2f6ccfb9494ad4a7e80f637d6",
+  "row_interval": [
+    0,
+    100
+  ],
+  "input_to_vlm": "blended observation only",
+  "output_csv_sha256": "efe9142a449c6aae88f2895d8d1cf79440449352df994aaa2becfeb1b4d74b47",
+  "raw_log_sha256": "9e1bf1acce2e1cae4a87f165b2bbc1f02562f19543c27be99ab904826cda39ec",
+  "note": "Pairs 20-99 reproduce the replies used in the paper run byte-for-byte; pairs 0-19 were regenerated with the same pinned model, instruction and greedy decoding."
+}

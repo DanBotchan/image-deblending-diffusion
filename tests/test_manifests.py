@@ -33,3 +33,15 @@ def test_manifest_hashes_and_protocol_fields():
             )
             assert "img1_source" not in frame.columns
             assert "img2_source" not in frame.columns
+
+
+def test_auto_prompt_manifest_only_replaces_prompts():
+    """Auto prompts must be evaluated on exactly the manual arm's spatial blends."""
+    manual = pd.read_csv(ROOT / "manifests/comparison/dataset_random_alpha_map.csv")
+    auto = pd.read_csv(ROOT / "manifests/auto_prompts/dataset_random_alpha_map_auto.csv")
+    prompts = ["img1_prompt", "img2_prompt"]
+    others = [column for column in manual.columns if column not in prompts]
+    assert list(auto.columns) == list(manual.columns)
+    assert auto[others].equals(manual[others])
+    changed = (auto[prompts] != manual[prompts]).any(axis=1)
+    assert changed[:100].all() and not changed[100:].any()

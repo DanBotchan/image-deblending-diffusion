@@ -1,0 +1,902 @@
+[
+  {
+    "row_index": 0,
+    "pair_id": "pair_000",
+    "blended_path": "pairs/pair_000/blended_polynomial.png",
+    "raw_response": "1. The image features a close-up of ripe strawberries with green leaves.\n2. The image shows a close-up of a wooden surface with a warm, golden hue.",
+    "img1_prompt": "The image features a close-up of ripe strawberries with green leaves.",
+    "img2_prompt": "The image shows a close-up of a wooden surface with a warm, golden hue.",
+    "parse_success": true
+  },
+  {
+    "row_index": 1,
+    "pair_id": "pair_001",
+    "blended_path": "pairs/pair_001/blended_polynomial.png",
+    "raw_response": "1. A baby orangutan with reddish fur and large, expressive eyes.\n2. A close-up of a ripe strawberry with a smooth, glossy surface.",
+    "img1_prompt": "A baby orangutan with reddish fur and large, expressive eyes.",
+    "img2_prompt": "A close-up of a ripe strawberry with a smooth, glossy surface.",
+    "parse_success": true
+  },
+  {
+    "row_index": 2,
+    "pair_id": "pair_002",
+    "blended_path": "pairs/pair_002/blended_polynomial.png",
+    "raw_response": "1. A squirrel is sitting on a rock.\n2. A bird is perched on a branch.",
+    "img1_prompt": "A squirrel is sitting on a rock.",
+    "img2_prompt": "A bird is perched on a branch.",
+    "parse_success": true
+  },
+  {
+    "row_index": 3,
+    "pair_id": "pair_003",
+    "blended_path": "pairs/pair_003/blended_polynomial.png",
+    "raw_response": "1. A bowl filled with various fruits, including bananas, apples, and oranges.\n2. A close-up of a person's hand holding a piece of fruit, possibly an apple or an orange.",
+    "img1_prompt": "A bowl filled with various fruits, including bananas, apples, and oranges.",
+    "img2_prompt": "A close-up of a person's hand holding a piece of fruit, possibly an apple or an orange.",
+    "parse_success": true
+  },
+  {
+    "row_index": 4,
+    "pair_id": "pair_004",
+    "blended_path": "pairs/pair_004/blended_polynomial.png",
+    "raw_response": "1. The photo shows a bowl filled with a variety of fruits, including apples and oranges.\n2. The photo captures a close-up of a person's hand holding a piece of fruit, possibly an apple.",
+    "img1_prompt": "The photo shows a bowl filled with a variety of fruits, including apples and oranges.",
+    "img2_prompt": "The photo captures a close-up of a person's hand holding a piece of fruit, possibly an apple.",
+    "parse_success": true
+  },
+  {
+    "row_index": 5,
+    "pair_id": "pair_005",
+    "blended_path": "pairs/pair_005/blended_polynomial.png",
+    "raw_response": "1. The photo shows a close-up of a ripe apple with a glossy surface.\n2. The photo depicts a group of oranges with a sticker on one of them.",
+    "img1_prompt": "The photo shows a close-up of a ripe apple with a glossy surface.",
+    "img2_prompt": "The photo depicts a group of oranges with a sticker on one of them.",
+    "parse_success": true
+  },
+  {
+    "row_index": 6,
+    "pair_id": "pair_006",
+    "blended_path": "pairs/pair_006/blended_polynomial.png",
+    "raw_response": "1. A deer with large antlers stands in a grassy field.\n2. A person is standing in a room with a window showing a view of the grassy field.",
+    "img1_prompt": "A deer with large antlers stands in a grassy field.",
+    "img2_prompt": "A person is standing in a room with a window showing a view of the grassy field.",
+    "parse_success": true
+  },
+  {
+    "row_index": 7,
+    "pair_id": "pair_007",
+    "blended_path": "pairs/pair_007/blended_polynomial.png",
+    "raw_response": "1. A black cat with yellow eyes is looking out of a window.\n2. A view of a forest with trees and sunlight filtering through the leaves.",
+    "img1_prompt": "A black cat with yellow eyes is looking out of a window.",
+    "img2_prompt": "A view of a forest with trees and sunlight filtering through the leaves.",
+    "parse_success": true
+  },
+  {
+    "row_index": 8,
+    "pair_id": "pair_008",
+    "blended_path": "pairs/pair_008/blended_polynomial.png",
+    "raw_response": "1. The image shows a variety of fresh fruits and vegetables, including bananas, apples, oranges, and tomatoes, displayed in a market setting.\n2. The image features a collection of colorful flowers arranged in a vase, set against a blurred background.",
+    "img1_prompt": "The image shows a variety of fresh fruits and vegetables, including bananas, apples, oranges, and tomatoes, displayed in a market setting.",
+    "img2_prompt": "The image features a collection of colorful flowers arranged in a vase, set against a blurred background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 9,
+    "pair_id": "pair_009",
+    "blended_path": "pairs/pair_009/blended_polynomial.png",
+    "raw_response": "1. A close-up of a vibrant, green, and orange chicken with a red comb and yellow eyes.\n2. A variety of fruits, including apples and lemons, in a colorful, blurred background.",
+    "img1_prompt": "A close-up of a vibrant, green, and orange chicken with a red comb and yellow eyes.",
+    "img2_prompt": "A variety of fruits, including apples and lemons, in a colorful, blurred background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 10,
+    "pair_id": "pair_010",
+    "blended_path": "pairs/pair_010/blended_polynomial.png",
+    "raw_response": "1. A wooden surface with a collection of fresh strawberries.\n2. A close-up view of a clear glass with a drink.",
+    "img1_prompt": "A wooden surface with a collection of fresh strawberries.",
+    "img2_prompt": "A close-up view of a clear glass with a drink.",
+    "parse_success": true
+  },
+  {
+    "row_index": 11,
+    "pair_id": "pair_011",
+    "blended_path": "pairs/pair_011/blended_polynomial.png",
+    "raw_response": "1. A vibrant fruit salad with a variety of colorful fruits.\n2. A close-up of a crystal glass filled with water.",
+    "img1_prompt": "A vibrant fruit salad with a variety of colorful fruits.",
+    "img2_prompt": "A close-up of a crystal glass filled with water.",
+    "parse_success": true
+  },
+  {
+    "row_index": 12,
+    "pair_id": "pair_012",
+    "blended_path": "pairs/pair_012/blended_polynomial.png",
+    "raw_response": "1. The first photo features a variety of fruits, including watermelons and oranges, arranged in a market setting.\n2. The second photo shows a close-up of a cat's face, with a focus on its eyes and nose.",
+    "img1_prompt": "The first photo features a variety of fruits, including watermelons and oranges, arranged in a market setting.",
+    "img2_prompt": "The second photo shows a close-up of a cat's face, with a focus on its eyes and nose.",
+    "parse_success": true
+  },
+  {
+    "row_index": 13,
+    "pair_id": "pair_013",
+    "blended_path": "pairs/pair_013/blended_polynomial.png",
+    "raw_response": "1. A squirrel is peeking out from a hole in a tree.\n2. A close-up of a squirrel's face, showing its eyes and ears.",
+    "img1_prompt": "A squirrel is peeking out from a hole in a tree.",
+    "img2_prompt": "A close-up of a squirrel's face, showing its eyes and ears.",
+    "parse_success": true
+  },
+  {
+    "row_index": 14,
+    "pair_id": "pair_014",
+    "blended_path": "pairs/pair_014/blended_polynomial.png",
+    "raw_response": "1. A dog is looking through a window.\n2. A snake is slithering through foliage.",
+    "img1_prompt": "A dog is looking through a window.",
+    "img2_prompt": "A snake is slithering through foliage.",
+    "parse_success": true
+  },
+  {
+    "row_index": 15,
+    "pair_id": "pair_015",
+    "blended_path": "pairs/pair_015/blended_polynomial.png",
+    "raw_response": "1. A strawberry with green leaves.\n2. A close-up of a plant with green leaves.",
+    "img1_prompt": "A strawberry with green leaves.",
+    "img2_prompt": "A close-up of a plant with green leaves.",
+    "parse_success": true
+  },
+  {
+    "row_index": 16,
+    "pair_id": "pair_016",
+    "blended_path": "pairs/pair_016/blended_polynomial.png",
+    "raw_response": "1. A variety of fresh fruits, including apples and pears, are displayed in a market setting.\n2. A person is holding a camera, capturing a scene with a focus on a green leafy plant.",
+    "img1_prompt": "A variety of fresh fruits, including apples and pears, are displayed in a market setting.",
+    "img2_prompt": "A person is holding a camera, capturing a scene with a focus on a green leafy plant.",
+    "parse_success": true
+  },
+  {
+    "row_index": 17,
+    "pair_id": "pair_017",
+    "blended_path": "pairs/pair_017/blended_polynomial.png",
+    "raw_response": "1. The image shows a group of green apples with a few white feathers scattered around.\n2. The image features a close-up of a cat's face with a blurred background.",
+    "img1_prompt": "The image shows a group of green apples with a few white feathers scattered around.",
+    "img2_prompt": "The image features a close-up of a cat's face with a blurred background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 18,
+    "pair_id": "pair_018",
+    "blended_path": "pairs/pair_018/blended_polynomial.png",
+    "raw_response": "1. A rhinoceros is standing on a dry, straw-covered ground.\n2. A deer is standing on a dry, straw-covered ground.",
+    "img1_prompt": "A rhinoceros is standing on a dry, straw-covered ground.",
+    "img2_prompt": "A deer is standing on a dry, straw-covered ground.",
+    "parse_success": true
+  },
+  {
+    "row_index": 19,
+    "pair_id": "pair_019",
+    "blended_path": "pairs/pair_019/blended_polynomial.png",
+    "raw_response": "1. A close-up of a flower with delicate petals and a soft focus.\n2. A close-up of a spider web with intricate details and a soft focus.",
+    "img1_prompt": "A close-up of a flower with delicate petals and a soft focus.",
+    "img2_prompt": "A close-up of a spider web with intricate details and a soft focus.",
+    "parse_success": true
+  },
+  {
+    "row_index": 20,
+    "pair_id": "pair_020",
+    "blended_path": "pairs/pair_020/blended_polynomial.png",
+    "raw_response": "1. A rabbit is sitting on a grassy field.\n2. A slice of lemon with a green background.",
+    "img1_prompt": "A rabbit is sitting on a grassy field.",
+    "img2_prompt": "A slice of lemon with a green background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 21,
+    "pair_id": "pair_021",
+    "blended_path": "pairs/pair_021/blended_polynomial.png",
+    "raw_response": "1. A bowl filled with cherries.\n2. A bird perched on a branch.",
+    "img1_prompt": "A bowl filled with cherries.",
+    "img2_prompt": "A bird perched on a branch.",
+    "parse_success": true
+  },
+  {
+    "row_index": 22,
+    "pair_id": "pair_022",
+    "blended_path": "pairs/pair_022/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of a cluster of ripe raspberries.\n2. The image features a close-up of a cluster of ripe raspberries.",
+    "img1_prompt": "The image shows a close-up of a cluster of ripe raspberries.",
+    "img2_prompt": "The image features a close-up of a cluster of ripe raspberries.",
+    "parse_success": true
+  },
+  {
+    "row_index": 23,
+    "pair_id": "pair_023",
+    "blended_path": "pairs/pair_023/blended_polynomial.png",
+    "raw_response": "1. A tiger with a fierce expression.\n2. A close-up of a tiger's face.",
+    "img1_prompt": "A tiger with a fierce expression.",
+    "img2_prompt": "A close-up of a tiger's face.",
+    "parse_success": true
+  },
+  {
+    "row_index": 24,
+    "pair_id": "pair_024",
+    "blended_path": "pairs/pair_024/blended_polynomial.png",
+    "raw_response": "1. A close-up of a blackberry bush with ripe berries.\n2. A close-up of a koala bear's face.",
+    "img1_prompt": "A close-up of a blackberry bush with ripe berries.",
+    "img2_prompt": "A close-up of a koala bear's face.",
+    "parse_success": true
+  },
+  {
+    "row_index": 25,
+    "pair_id": "pair_025",
+    "blended_path": "pairs/pair_025/blended_polynomial.png",
+    "raw_response": "1. A monkey is sitting on a chair.\n2. A person is holding a pink umbrella.",
+    "img1_prompt": "A monkey is sitting on a chair.",
+    "img2_prompt": "A person is holding a pink umbrella.",
+    "parse_success": true
+  },
+  {
+    "row_index": 26,
+    "pair_id": "pair_026",
+    "blended_path": "pairs/pair_026/blended_polynomial.png",
+    "raw_response": "1. The image shows a market stall with a variety of fruits, including oranges, apples, and pears, displayed in net bags and baskets.\n2. The scene captures a bustling street market with vendors selling fresh produce, including a large selection of fruits and vegetables.",
+    "img1_prompt": "The image shows a market stall with a variety of fruits, including oranges, apples, and pears, displayed in net bags and baskets.",
+    "img2_prompt": "The scene captures a bustling street market with vendors selling fresh produce, including a large selection of fruits and vegetables.",
+    "parse_success": true
+  },
+  {
+    "row_index": 27,
+    "pair_id": "pair_027",
+    "blended_path": "pairs/pair_027/blended_polynomial.png",
+    "raw_response": "1. A cat with a curious expression.\n2. A background of small, round, pink objects.",
+    "img1_prompt": "A cat with a curious expression.",
+    "img2_prompt": "A background of small, round, pink objects.",
+    "parse_success": true
+  },
+  {
+    "row_index": 28,
+    "pair_id": "pair_028",
+    "blended_path": "pairs/pair_028/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of red berries with green leaves.\n2. The image depicts a close-up of a black cat with a blurred background.",
+    "img1_prompt": "The image shows a close-up of red berries with green leaves.",
+    "img2_prompt": "The image depicts a close-up of a black cat with a blurred background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 29,
+    "pair_id": "pair_029",
+    "blended_path": "pairs/pair_029/blended_polynomial.png",
+    "raw_response": "1. A colorful array of fruits, including apples and oranges, are displayed in a glass container.\n2. A rabbit is sitting on a surface, possibly a table or countertop.",
+    "img1_prompt": "A colorful array of fruits, including apples and oranges, are displayed in a glass container.",
+    "img2_prompt": "A rabbit is sitting on a surface, possibly a table or countertop.",
+    "parse_success": true
+  },
+  {
+    "row_index": 30,
+    "pair_id": "pair_030",
+    "blended_path": "pairs/pair_030/blended_polynomial.png",
+    "raw_response": "1. The first photo features a close-up of various fruits, including grapes and bananas.\n2. The second photo shows a bird perched on a branch.",
+    "img1_prompt": "The first photo features a close-up of various fruits, including grapes and bananas.",
+    "img2_prompt": "The second photo shows a bird perched on a branch.",
+    "parse_success": true
+  },
+  {
+    "row_index": 31,
+    "pair_id": "pair_031",
+    "blended_path": "pairs/pair_031/blended_polynomial.png",
+    "raw_response": "1. A squirrel is eating a nut.\n2. A bird is perched on a branch.",
+    "img1_prompt": "A squirrel is eating a nut.",
+    "img2_prompt": "A bird is perched on a branch.",
+    "parse_success": true
+  },
+  {
+    "row_index": 32,
+    "pair_id": "pair_032",
+    "blended_path": "pairs/pair_032/blended_polynomial.png",
+    "raw_response": "1. A cat with green eyes and a white nose.\n2. A cat with blue eyes and a white nose.",
+    "img1_prompt": "A cat with green eyes and a white nose.",
+    "img2_prompt": "A cat with blue eyes and a white nose.",
+    "parse_success": true
+  },
+  {
+    "row_index": 33,
+    "pair_id": "pair_033",
+    "blended_path": "pairs/pair_033/blended_polynomial.png",
+    "raw_response": "1. A squirrel is peeking out from behind a bush.\n2. A container of raspberries is on a table.",
+    "img1_prompt": "A squirrel is peeking out from behind a bush.",
+    "img2_prompt": "A container of raspberries is on a table.",
+    "parse_success": true
+  },
+  {
+    "row_index": 34,
+    "pair_id": "pair_034",
+    "blended_path": "pairs/pair_034/blended_polynomial.png",
+    "raw_response": "1. A fox is standing in a field.\n2. A group of raspberries is scattered on the ground.",
+    "img1_prompt": "A fox is standing in a field.",
+    "img2_prompt": "A group of raspberries is scattered on the ground.",
+    "parse_success": true
+  },
+  {
+    "row_index": 35,
+    "pair_id": "pair_035",
+    "blended_path": "pairs/pair_035/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of a box filled with raspberries, some of which are red and some are yellow.\n2. The image features a bird perched on a branch, with a blurred background.",
+    "img1_prompt": "The image shows a close-up of a box filled with raspberries, some of which are red and some are yellow.",
+    "img2_prompt": "The image features a bird perched on a branch, with a blurred background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 36,
+    "pair_id": "pair_036",
+    "blended_path": "pairs/pair_036/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of fresh blackberries and slices of yellow fruit, possibly peaches or nectarines.\n2. The image features a close-up of blueberries and slices of yellow fruit, possibly peaches or nectarines.",
+    "img1_prompt": "The image shows a close-up of fresh blackberries and slices of yellow fruit, possibly peaches or nectarines.",
+    "img2_prompt": "The image features a close-up of blueberries and slices of yellow fruit, possibly peaches or nectarines.",
+    "parse_success": true
+  },
+  {
+    "row_index": 37,
+    "pair_id": "pair_037",
+    "blended_path": "pairs/pair_037/blended_polynomial.png",
+    "raw_response": "1. A cat with a greenish hue, possibly due to a filter or lighting effect.\n2. Red berries with white speckles, likely raspberry or blackberry, in a natural setting.",
+    "img1_prompt": "A cat with a greenish hue, possibly due to a filter or lighting effect.",
+    "img2_prompt": "Red berries with white speckles, likely raspberry or blackberry, in a natural setting.",
+    "parse_success": true
+  },
+  {
+    "row_index": 38,
+    "pair_id": "pair_038",
+    "blended_path": "pairs/pair_038/blended_polynomial.png",
+    "raw_response": "1. The image shows a collection of ripe peaches arranged in a grid pattern.\n2. The background appears to be a blurred outdoor setting, possibly a garden or a park.",
+    "img1_prompt": "The image shows a collection of ripe peaches arranged in a grid pattern.",
+    "img2_prompt": "The background appears to be a blurred outdoor setting, possibly a garden or a park.",
+    "parse_success": true
+  },
+  {
+    "row_index": 39,
+    "pair_id": "pair_039",
+    "blended_path": "pairs/pair_039/blended_polynomial.png",
+    "raw_response": "1. A lemur with a distinctive face and fur.\n2. A blurred background with greenery and light.",
+    "img1_prompt": "A lemur with a distinctive face and fur.",
+    "img2_prompt": "A blurred background with greenery and light.",
+    "parse_success": true
+  },
+  {
+    "row_index": 40,
+    "pair_id": "pair_040",
+    "blended_path": "pairs/pair_040/blended_polynomial.png",
+    "raw_response": "1. A market stall with a variety of fresh fruits, including apples, displayed in a wooden crate.\n2. A garden scene with a variety of flowers, including chrysanthemums, arranged in a wooden crate.",
+    "img1_prompt": "A market stall with a variety of fresh fruits, including apples, displayed in a wooden crate.",
+    "img2_prompt": "A garden scene with a variety of flowers, including chrysanthemums, arranged in a wooden crate.",
+    "parse_success": true
+  },
+  {
+    "row_index": 41,
+    "pair_id": "pair_041",
+    "blended_path": "pairs/pair_041/blended_polynomial.png",
+    "raw_response": "1. A cat is sitting in a bowl filled with blueberries.\n2. A bowl of blueberries is placed on a bed of leaves.",
+    "img1_prompt": "A cat is sitting in a bowl filled with blueberries.",
+    "img2_prompt": "A bowl of blueberries is placed on a bed of leaves.",
+    "parse_success": true
+  },
+  {
+    "row_index": 42,
+    "pair_id": "pair_042",
+    "blended_path": "pairs/pair_042/blended_polynomial.png",
+    "raw_response": "1. A dog with a brown coat is sitting in front of a wooden fence.\n2. A colorful abstract pattern with circular shapes is visible in the background.",
+    "img1_prompt": "A dog with a brown coat is sitting in front of a wooden fence.",
+    "img2_prompt": "A colorful abstract pattern with circular shapes is visible in the background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 43,
+    "pair_id": "pair_043",
+    "blended_path": "pairs/pair_043/blended_polynomial.png",
+    "raw_response": "1. A cat is sitting on a wooden surface.\n2. A lemon is placed on a wooden surface.",
+    "img1_prompt": "A cat is sitting on a wooden surface.",
+    "img2_prompt": "A lemon is placed on a wooden surface.",
+    "parse_success": true
+  },
+  {
+    "row_index": 44,
+    "pair_id": "pair_044",
+    "blended_path": "pairs/pair_044/blended_polynomial.png",
+    "raw_response": "1. A majestic deer with large antlers stands in a serene forest.\n2. A tranquil forest scene with trees and sunlight filtering through the leaves.",
+    "img1_prompt": "A majestic deer with large antlers stands in a serene forest.",
+    "img2_prompt": "A tranquil forest scene with trees and sunlight filtering through the leaves.",
+    "parse_success": true
+  },
+  {
+    "row_index": 45,
+    "pair_id": "pair_045",
+    "blended_path": "pairs/pair_045/blended_polynomial.png",
+    "raw_response": "1. A cat is sitting on a table with a bowl of strawberries.\n2. A cat is sitting on a table with a bowl of strawberries.",
+    "img1_prompt": "A cat is sitting on a table with a bowl of strawberries.",
+    "img2_prompt": "A cat is sitting on a table with a bowl of strawberries.",
+    "parse_success": true
+  },
+  {
+    "row_index": 46,
+    "pair_id": "pair_046",
+    "blended_path": "pairs/pair_046/blended_polynomial.png",
+    "raw_response": "1. The image shows a bunch of citrus fruits, including oranges and lemons, neatly arranged on a table.\n2. The background features a blurred scene with a person and some indistinct objects, suggesting an indoor setting.",
+    "img1_prompt": "The image shows a bunch of citrus fruits, including oranges and lemons, neatly arranged on a table.",
+    "img2_prompt": "The background features a blurred scene with a person and some indistinct objects, suggesting an indoor setting.",
+    "parse_success": true
+  },
+  {
+    "row_index": 47,
+    "pair_id": "pair_047",
+    "blended_path": "pairs/pair_047/blended_polynomial.png",
+    "raw_response": "1. A leopard is resting on a tree branch.\n2. A bee is hovering near a flower.",
+    "img1_prompt": "A leopard is resting on a tree branch.",
+    "img2_prompt": "A bee is hovering near a flower.",
+    "parse_success": true
+  },
+  {
+    "row_index": 48,
+    "pair_id": "pair_048",
+    "blended_path": "pairs/pair_048/blended_polynomial.png",
+    "raw_response": "1. A cat with a greenish hue and a red, flower-like object on its head.\n2. A colorful, abstract scene with vibrant colors and shapes.",
+    "img1_prompt": "A cat with a greenish hue and a red, flower-like object on its head.",
+    "img2_prompt": "A colorful, abstract scene with vibrant colors and shapes.",
+    "parse_success": true
+  },
+  {
+    "row_index": 49,
+    "pair_id": "pair_049",
+    "blended_path": "pairs/pair_049/blended_polynomial.png",
+    "raw_response": "1. The image shows a cluster of small, round, pinkish fruits with green leaves.\n2. The background features a blurred, natural setting with green foliage and sunlight filtering through.",
+    "img1_prompt": "The image shows a cluster of small, round, pinkish fruits with green leaves.",
+    "img2_prompt": "The background features a blurred, natural setting with green foliage and sunlight filtering through.",
+    "parse_success": true
+  },
+  {
+    "row_index": 50,
+    "pair_id": "pair_050",
+    "blended_path": "pairs/pair_050/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of a kiwi fruit, highlighting its vibrant green skin and the yellow flesh with dark seeds.\n2. The image captures a close-up of a caterpillar, emphasizing its segmented body and the intricate details of its skin.",
+    "img1_prompt": "The image shows a close-up of a kiwi fruit, highlighting its vibrant green skin and the yellow flesh with dark seeds.",
+    "img2_prompt": "The image captures a close-up of a caterpillar, emphasizing its segmented body and the intricate details of its skin.",
+    "parse_success": true
+  },
+  {
+    "row_index": 51,
+    "pair_id": "pair_051",
+    "blended_path": "pairs/pair_051/blended_polynomial.png",
+    "raw_response": "1. A cat with orange and white fur is sitting in a green environment.\n2. A green, leafy plant is in a pot.",
+    "img1_prompt": "A cat with orange and white fur is sitting in a green environment.",
+    "img2_prompt": "A green, leafy plant is in a pot.",
+    "parse_success": true
+  },
+  {
+    "row_index": 52,
+    "pair_id": "pair_052",
+    "blended_path": "pairs/pair_052/blended_polynomial.png",
+    "raw_response": "1. A cat with yellow eyes and a striped pattern.\n2. A person sitting on a couch.",
+    "img1_prompt": "A cat with yellow eyes and a striped pattern.",
+    "img2_prompt": "A person sitting on a couch.",
+    "parse_success": true
+  },
+  {
+    "row_index": 53,
+    "pair_id": "pair_053",
+    "blended_path": "pairs/pair_053/blended_polynomial.png",
+    "raw_response": "1. A duck is swimming in a body of water.\n2. A jellyfish is floating in the water.",
+    "img1_prompt": "A duck is swimming in a body of water.",
+    "img2_prompt": "A jellyfish is floating in the water.",
+    "parse_success": true
+  },
+  {
+    "row_index": 54,
+    "pair_id": "pair_054",
+    "blended_path": "pairs/pair_054/blended_polynomial.png",
+    "raw_response": "1. The first photo features a variety of fruits, including apples, grapes, and coconuts, arranged on a table.\n2. The second photo shows a still life arrangement with a mix of fruits and vegetables, including tomatoes and cucumbers.",
+    "img1_prompt": "The first photo features a variety of fruits, including apples, grapes, and coconuts, arranged on a table.",
+    "img2_prompt": "The second photo shows a still life arrangement with a mix of fruits and vegetables, including tomatoes and cucumbers.",
+    "parse_success": true
+  },
+  {
+    "row_index": 55,
+    "pair_id": "pair_055",
+    "blended_path": "pairs/pair_055/blended_polynomial.png",
+    "raw_response": "1. A cat is sitting on a bench in a lush garden with vibrant flowers and greenery.\n2. A serene landscape with rolling hills and a clear blue sky.",
+    "img1_prompt": "A cat is sitting on a bench in a lush garden with vibrant flowers and greenery.",
+    "img2_prompt": "A serene landscape with rolling hills and a clear blue sky.",
+    "parse_success": true
+  },
+  {
+    "row_index": 56,
+    "pair_id": "pair_056",
+    "blended_path": "pairs/pair_056/blended_polynomial.png",
+    "raw_response": "1. A long-necked animal with a distinctive pattern of spots.\n2. A plate of fruits with a blurred background.",
+    "img1_prompt": "A long-necked animal with a distinctive pattern of spots.",
+    "img2_prompt": "A plate of fruits with a blurred background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 57,
+    "pair_id": "pair_057",
+    "blended_path": "pairs/pair_057/blended_polynomial.png",
+    "raw_response": "1. The first photo shows a close-up of a kiwi fruit cut in half, revealing its green flesh and seeds.\n2. The second photo depicts a close-up of a cat's face, focusing on its eyes and nose.",
+    "img1_prompt": "The first photo shows a close-up of a kiwi fruit cut in half, revealing its green flesh and seeds.",
+    "img2_prompt": "The second photo depicts a close-up of a cat's face, focusing on its eyes and nose.",
+    "parse_success": true
+  },
+  {
+    "row_index": 58,
+    "pair_id": "pair_058",
+    "blended_path": "pairs/pair_058/blended_polynomial.png",
+    "raw_response": "1. A deer with antlers in a forest setting.\n2. A close-up of a plant with red and green leaves.",
+    "img1_prompt": "A deer with antlers in a forest setting.",
+    "img2_prompt": "A close-up of a plant with red and green leaves.",
+    "parse_success": true
+  },
+  {
+    "row_index": 59,
+    "pair_id": "pair_059",
+    "blended_path": "pairs/pair_059/blended_polynomial.png",
+    "raw_response": "1. A dog is standing behind a fence.\n2. Strawberries are arranged on a table.",
+    "img1_prompt": "A dog is standing behind a fence.",
+    "img2_prompt": "Strawberries are arranged on a table.",
+    "parse_success": true
+  },
+  {
+    "row_index": 60,
+    "pair_id": "pair_060",
+    "blended_path": "pairs/pair_060/blended_polynomial.png",
+    "raw_response": "1. A deer is standing in a field with a misty background.\n2. A kiwi fruit is sliced in half, with the inside facing outward.",
+    "img1_prompt": "A deer is standing in a field with a misty background.",
+    "img2_prompt": "A kiwi fruit is sliced in half, with the inside facing outward.",
+    "parse_success": true
+  },
+  {
+    "row_index": 61,
+    "pair_id": "pair_061",
+    "blended_path": "pairs/pair_061/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of various fresh fruits, including strawberries, blueberries, and blackberries.\n2. The image depicts a close-up of a tea bag in a cup with hot water being poured over it.",
+    "img1_prompt": "The image shows a close-up of various fresh fruits, including strawberries, blueberries, and blackberries.",
+    "img2_prompt": "The image depicts a close-up of a tea bag in a cup with hot water being poured over it.",
+    "parse_success": true
+  },
+  {
+    "row_index": 62,
+    "pair_id": "pair_062",
+    "blended_path": "pairs/pair_062/blended_polynomial.png",
+    "raw_response": "1. A small bird is perched on a branch.\n2. A cat is sitting on a blue blanket.",
+    "img1_prompt": "A small bird is perched on a branch.",
+    "img2_prompt": "A cat is sitting on a blue blanket.",
+    "parse_success": true
+  },
+  {
+    "row_index": 63,
+    "pair_id": "pair_063",
+    "blended_path": "pairs/pair_063/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of a peach with a smooth, fuzzy texture.\n2. The image features a cat with a calm expression, sitting in a relaxed position.",
+    "img1_prompt": "The image shows a close-up of a peach with a smooth, fuzzy texture.",
+    "img2_prompt": "The image features a cat with a calm expression, sitting in a relaxed position.",
+    "parse_success": true
+  },
+  {
+    "row_index": 64,
+    "pair_id": "pair_064",
+    "blended_path": "pairs/pair_064/blended_polynomial.png",
+    "raw_response": "1. A ripe mango with a green and yellow skin.\n2. A person wearing a blue shirt, standing in a field of tall green grass.",
+    "img1_prompt": "A ripe mango with a green and yellow skin.",
+    "img2_prompt": "A person wearing a blue shirt, standing in a field of tall green grass.",
+    "parse_success": true
+  },
+  {
+    "row_index": 65,
+    "pair_id": "pair_065",
+    "blended_path": "pairs/pair_065/blended_polynomial.png",
+    "raw_response": "1. The first photo features a close-up of a cluster of ripe grapes.\n2. The second photo shows a close-up of a piece of fruit, possibly an apple, with a textured skin.",
+    "img1_prompt": "The first photo features a close-up of a cluster of ripe grapes.",
+    "img2_prompt": "The second photo shows a close-up of a piece of fruit, possibly an apple, with a textured skin.",
+    "parse_success": true
+  },
+  {
+    "row_index": 66,
+    "pair_id": "pair_066",
+    "blended_path": "pairs/pair_066/blended_polynomial.png",
+    "raw_response": "1. A cat is sitting on a green surface.\n2. A bowl of raspberries is placed on a green surface.",
+    "img1_prompt": "A cat is sitting on a green surface.",
+    "img2_prompt": "A bowl of raspberries is placed on a green surface.",
+    "parse_success": true
+  },
+  {
+    "row_index": 67,
+    "pair_id": "pair_067",
+    "blended_path": "pairs/pair_067/blended_polynomial.png",
+    "raw_response": "1. A cow is standing on a brick path.\n2. A cow is standing on a brick path.",
+    "img1_prompt": "A cow is standing on a brick path.",
+    "img2_prompt": "A cow is standing on a brick path.",
+    "parse_success": true
+  },
+  {
+    "row_index": 68,
+    "pair_id": "pair_068",
+    "blended_path": "pairs/pair_068/blended_polynomial.png",
+    "raw_response": "1. A bunch of green grapes.\n2. A dog with a fluffy coat.",
+    "img1_prompt": "A bunch of green grapes.",
+    "img2_prompt": "A dog with a fluffy coat.",
+    "parse_success": true
+  },
+  {
+    "row_index": 69,
+    "pair_id": "pair_069",
+    "blended_path": "pairs/pair_069/blended_polynomial.png",
+    "raw_response": "1. The photo shows a variety of fresh, ripe strawberries.\n2. The photo depicts a cluster of dark, plump grapes.",
+    "img1_prompt": "The photo shows a variety of fresh, ripe strawberries.",
+    "img2_prompt": "The photo depicts a cluster of dark, plump grapes.",
+    "parse_success": true
+  },
+  {
+    "row_index": 70,
+    "pair_id": "pair_070",
+    "blended_path": "pairs/pair_070/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of a cluster of ripe red grapes on a vine.\n2. The image features a close-up of a plant with green leaves and a few unripe fruits.",
+    "img1_prompt": "The image shows a close-up of a cluster of ripe red grapes on a vine.",
+    "img2_prompt": "The image features a close-up of a plant with green leaves and a few unripe fruits.",
+    "parse_success": true
+  },
+  {
+    "row_index": 71,
+    "pair_id": "pair_071",
+    "blended_path": "pairs/pair_071/blended_polynomial.png",
+    "raw_response": "1. A bird with a distinctive orange beak and white chest is perched on a branch.\n2. A variety of fruits, including grapes and apples, are displayed in a vibrant setting.",
+    "img1_prompt": "A bird with a distinctive orange beak and white chest is perched on a branch.",
+    "img2_prompt": "A variety of fruits, including grapes and apples, are displayed in a vibrant setting.",
+    "parse_success": true
+  },
+  {
+    "row_index": 72,
+    "pair_id": "pair_072",
+    "blended_path": "pairs/pair_072/blended_polynomial.png",
+    "raw_response": "1. The image shows a cluster of grapes with some leaves.\n2. The image features a close-up of a vineyard with green and purple grapes.",
+    "img1_prompt": "The image shows a cluster of grapes with some leaves.",
+    "img2_prompt": "The image features a close-up of a vineyard with green and purple grapes.",
+    "parse_success": true
+  },
+  {
+    "row_index": 73,
+    "pair_id": "pair_073",
+    "blended_path": "pairs/pair_073/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of a peach with a vibrant orange and red hue.\n2. The image features a close-up of a peach with a smooth, glossy texture.",
+    "img1_prompt": "The image shows a close-up of a peach with a vibrant orange and red hue.",
+    "img2_prompt": "The image features a close-up of a peach with a smooth, glossy texture.",
+    "parse_success": true
+  },
+  {
+    "row_index": 74,
+    "pair_id": "pair_074",
+    "blended_path": "pairs/pair_074/blended_polynomial.png",
+    "raw_response": "1. The image shows a vibrant market scene with a variety of fresh fruits and vegetables displayed on tables.\n2. The scene captures a bustling city street with people walking and engaging in daily activities.",
+    "img1_prompt": "The image shows a vibrant market scene with a variety of fresh fruits and vegetables displayed on tables.",
+    "img2_prompt": "The scene captures a bustling city street with people walking and engaging in daily activities.",
+    "parse_success": true
+  },
+  {
+    "row_index": 75,
+    "pair_id": "pair_075",
+    "blended_path": "pairs/pair_075/blended_polynomial.png",
+    "raw_response": "1. A deer is standing in a forest.\n2. Five eggs with a marbled pattern are arranged in a row.",
+    "img1_prompt": "A deer is standing in a forest.",
+    "img2_prompt": "Five eggs with a marbled pattern are arranged in a row.",
+    "parse_success": true
+  },
+  {
+    "row_index": 76,
+    "pair_id": "pair_076",
+    "blended_path": "pairs/pair_076/blended_polynomial.png",
+    "raw_response": "1. A cat with blue eyes is peeking out from a pile of blueberries.\n2. A cup filled with blueberries is on a table.",
+    "img1_prompt": "A cat with blue eyes is peeking out from a pile of blueberries.",
+    "img2_prompt": "A cup filled with blueberries is on a table.",
+    "parse_success": true
+  },
+  {
+    "row_index": 77,
+    "pair_id": "pair_077",
+    "blended_path": "pairs/pair_077/blended_polynomial.png",
+    "raw_response": "1. A fox is sleeping on a tree branch.\n2. There are figs on a tree.",
+    "img1_prompt": "A fox is sleeping on a tree branch.",
+    "img2_prompt": "There are figs on a tree.",
+    "parse_success": true
+  },
+  {
+    "row_index": 78,
+    "pair_id": "pair_078",
+    "blended_path": "pairs/pair_078/blended_polynomial.png",
+    "raw_response": "1. A squirrel is sitting on a pile of nuts.\n2. A close-up of a cactus with spines.",
+    "img1_prompt": "A squirrel is sitting on a pile of nuts.",
+    "img2_prompt": "A close-up of a cactus with spines.",
+    "parse_success": true
+  },
+  {
+    "row_index": 79,
+    "pair_id": "pair_079",
+    "blended_path": "pairs/pair_079/blended_polynomial.png",
+    "raw_response": "1. A bird is perched on a branch with a blurred background of green foliage.\n2. A close-up of a plant with large, open seed pods.",
+    "img1_prompt": "A bird is perched on a branch with a blurred background of green foliage.",
+    "img2_prompt": "A close-up of a plant with large, open seed pods.",
+    "parse_success": true
+  },
+  {
+    "row_index": 80,
+    "pair_id": "pair_080",
+    "blended_path": "pairs/pair_080/blended_polynomial.png",
+    "raw_response": "1. The image shows a close-up of cherries with stems and leaves.\n2. The image depicts a close-up of a bird with its wings spread.",
+    "img1_prompt": "The image shows a close-up of cherries with stems and leaves.",
+    "img2_prompt": "The image depicts a close-up of a bird with its wings spread.",
+    "parse_success": true
+  },
+  {
+    "row_index": 81,
+    "pair_id": "pair_081",
+    "blended_path": "pairs/pair_081/blended_polynomial.png",
+    "raw_response": "1. A banana with brown spots.\n2. A fruit with a smooth, shiny surface.",
+    "img1_prompt": "A banana with brown spots.",
+    "img2_prompt": "A fruit with a smooth, shiny surface.",
+    "parse_success": true
+  },
+  {
+    "row_index": 82,
+    "pair_id": "pair_082",
+    "blended_path": "pairs/pair_082/blended_polynomial.png",
+    "raw_response": "1. A close-up of a cat surrounded by raspberries.\n2. A close-up of raspberries.",
+    "img1_prompt": "A close-up of a cat surrounded by raspberries.",
+    "img2_prompt": "A close-up of raspberries.",
+    "parse_success": true
+  },
+  {
+    "row_index": 83,
+    "pair_id": "pair_083",
+    "blended_path": "pairs/pair_083/blended_polynomial.png",
+    "raw_response": "1. The image shows a variety of fresh fruits, including bananas, apples, pears, and lemons, arranged on a table.\n2. The image features a close-up of a blueberry container with a label, surrounded by other fruits.",
+    "img1_prompt": "The image shows a variety of fresh fruits, including bananas, apples, pears, and lemons, arranged on a table.",
+    "img2_prompt": "The image features a close-up of a blueberry container with a label, surrounded by other fruits.",
+    "parse_success": true
+  },
+  {
+    "row_index": 84,
+    "pair_id": "pair_084",
+    "blended_path": "pairs/pair_084/blended_polynomial.png",
+    "raw_response": "1. A still life arrangement of various fruits, including grapes and apples, on a wooden table.\n2. A close-up view of a clear glass container filled with water.",
+    "img1_prompt": "A still life arrangement of various fruits, including grapes and apples, on a wooden table.",
+    "img2_prompt": "A close-up view of a clear glass container filled with water.",
+    "parse_success": true
+  },
+  {
+    "row_index": 85,
+    "pair_id": "pair_085",
+    "blended_path": "pairs/pair_085/blended_polynomial.png",
+    "raw_response": "1. A cat is sitting on a windowsill, looking out at the world.\n2. A cat is sitting on a windowsill, looking out at the world.",
+    "img1_prompt": "A cat is sitting on a windowsill, looking out at the world.",
+    "img2_prompt": "A cat is sitting on a windowsill, looking out at the world.",
+    "parse_success": true
+  },
+  {
+    "row_index": 86,
+    "pair_id": "pair_086",
+    "blended_path": "pairs/pair_086/blended_polynomial.png",
+    "raw_response": "1. A majestic antelope with large curved horns stands in a natural habitat.\n2. A serene forest scene with trees and a clear blue sky.",
+    "img1_prompt": "A majestic antelope with large curved horns stands in a natural habitat.",
+    "img2_prompt": "A serene forest scene with trees and a clear blue sky.",
+    "parse_success": true
+  },
+  {
+    "row_index": 87,
+    "pair_id": "pair_087",
+    "blended_path": "pairs/pair_087/blended_polynomial.png",
+    "raw_response": "1. A cow is grazing in a field.\n2. A sun is rising over a lake.",
+    "img1_prompt": "A cow is grazing in a field.",
+    "img2_prompt": "A sun is rising over a lake.",
+    "parse_success": true
+  },
+  {
+    "row_index": 88,
+    "pair_id": "pair_088",
+    "blended_path": "pairs/pair_088/blended_polynomial.png",
+    "raw_response": "1. A frog is sitting on a textured surface.\n2. A slice of lemon is placed on the same textured surface.",
+    "img1_prompt": "A frog is sitting on a textured surface.",
+    "img2_prompt": "A slice of lemon is placed on the same textured surface.",
+    "parse_success": true
+  },
+  {
+    "row_index": 89,
+    "pair_id": "pair_089",
+    "blended_path": "pairs/pair_089/blended_polynomial.png",
+    "raw_response": "1. The image shows a variety of fresh fruits, including mangoes and guavas, displayed in a market setting.\n2. The scene depicts a bustling street market with vendors selling a range of fresh produce.",
+    "img1_prompt": "The image shows a variety of fresh fruits, including mangoes and guavas, displayed in a market setting.",
+    "img2_prompt": "The scene depicts a bustling street market with vendors selling a range of fresh produce.",
+    "parse_success": true
+  },
+  {
+    "row_index": 90,
+    "pair_id": "pair_090",
+    "blended_path": "pairs/pair_090/blended_polynomial.png",
+    "raw_response": "1. A cat with a surprised expression.\n2. A close-up of blackberries.",
+    "img1_prompt": "A cat with a surprised expression.",
+    "img2_prompt": "A close-up of blackberries.",
+    "parse_success": true
+  },
+  {
+    "row_index": 91,
+    "pair_id": "pair_091",
+    "blended_path": "pairs/pair_091/blended_polynomial.png",
+    "raw_response": "1. Two red apples with green stems.\n2. A close-up of a cat's face with a blurred background.",
+    "img1_prompt": "Two red apples with green stems.",
+    "img2_prompt": "A close-up of a cat's face with a blurred background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 92,
+    "pair_id": "pair_092",
+    "blended_path": "pairs/pair_092/blended_polynomial.png",
+    "raw_response": "1. A cat with yellow eyes and a collar is sitting on a dark surface.\n2. A person is standing on a street with a building in the background.",
+    "img1_prompt": "A cat with yellow eyes and a collar is sitting on a dark surface.",
+    "img2_prompt": "A person is standing on a street with a building in the background.",
+    "parse_success": true
+  },
+  {
+    "row_index": 93,
+    "pair_id": "pair_093",
+    "blended_path": "pairs/pair_093/blended_polynomial.png",
+    "raw_response": "1. A sheep is standing in a field with a green pasture.\n2. A person is holding a green leaf in their hand.",
+    "img1_prompt": "A sheep is standing in a field with a green pasture.",
+    "img2_prompt": "A person is holding a green leaf in their hand.",
+    "parse_success": true
+  },
+  {
+    "row_index": 94,
+    "pair_id": "pair_094",
+    "blended_path": "pairs/pair_094/blended_polynomial.png",
+    "raw_response": "1. A close-up of a ripe apple with a stem.\n2. A close-up of a person's face.",
+    "img1_prompt": "A close-up of a ripe apple with a stem.",
+    "img2_prompt": "A close-up of a person's face.",
+    "parse_success": true
+  },
+  {
+    "row_index": 95,
+    "pair_id": "pair_095",
+    "blended_path": "pairs/pair_095/blended_polynomial.png",
+    "raw_response": "1. The first photo shows a bustling market scene with a variety of fresh fruits and vegetables displayed on a table.\n2. The second photo captures a serene garden with lush greenery and a small pond.",
+    "img1_prompt": "The first photo shows a bustling market scene with a variety of fresh fruits and vegetables displayed on a table.",
+    "img2_prompt": "The second photo captures a serene garden with lush greenery and a small pond.",
+    "parse_success": true
+  },
+  {
+    "row_index": 96,
+    "pair_id": "pair_096",
+    "blended_path": "pairs/pair_096/blended_polynomial.png",
+    "raw_response": "1. A lizard with a green and yellow pattern is resting on a rock.\n2. A piece of pink meat is being held up, possibly for consumption.",
+    "img1_prompt": "A lizard with a green and yellow pattern is resting on a rock.",
+    "img2_prompt": "A piece of pink meat is being held up, possibly for consumption.",
+    "parse_success": true
+  },
+  {
+    "row_index": 97,
+    "pair_id": "pair_097",
+    "blended_path": "pairs/pair_097/blended_polynomial.png",
+    "raw_response": "1. A kitten is peeking out from behind a bush with red berries.\n2. A forest scene with trees and green foliage.",
+    "img1_prompt": "A kitten is peeking out from behind a bush with red berries.",
+    "img2_prompt": "A forest scene with trees and green foliage.",
+    "parse_success": true
+  },
+  {
+    "row_index": 98,
+    "pair_id": "pair_098",
+    "blended_path": "pairs/pair_098/blended_polynomial.png",
+    "raw_response": "1. A cat is licking a paw.\n2. A cat is sitting on a bed.",
+    "img1_prompt": "A cat is licking a paw.",
+    "img2_prompt": "A cat is sitting on a bed.",
+    "parse_success": true
+  },
+  {
+    "row_index": 99,
+    "pair_id": "pair_099",
+    "blended_path": "pairs/pair_099/blended_polynomial.png",
+    "raw_response": "1. A close-up of a yellow and black wasp on a wooden surface.\n2. A close-up of a red circular object on a wooden surface.",
+    "img1_prompt": "A close-up of a yellow and black wasp on a wooden surface.",
+    "img2_prompt": "A close-up of a red circular object on a wooden surface.",
+    "parse_success": true
+  }
+]
