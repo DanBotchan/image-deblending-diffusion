@@ -5,10 +5,10 @@ type: software
 authors:
   - family-names: Botchan
     given-names: Dan
-  - family-names: Hel-Or
-    given-names: Yacov
   - family-names: Fried
     given-names: Ohad
+  - family-names: Hel-Or
+    given-names: Yacov
 version: 0.1.0
 date-released: 2026-08-28
 preferred-citation:
@@ -17,10 +17,10 @@ preferred-citation:
   authors:
     - family-names: Botchan
       given-names: Dan
-    - family-names: Hel-Or
-      given-names: Yacov
     - family-names: Fried
       given-names: Ohad
+    - family-names: Hel-Or
+      given-names: Yacov
   conference:
     name: "IEEE/CVF Winter Conference on Applications of Computer Vision"
   year: 2027

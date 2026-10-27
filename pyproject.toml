@@ -10,8 +10,8 @@ readme = "README.md"
 requires-python = ">=3.9,<3.11"
 authors = [
   {name = "Dan Botchan"},
-  {name = "Yacov Hel-Or"},
   {name = "Ohad Fried"},
+  {name = "Yacov Hel-Or"},
 ]
 dependencies = [
   "albumentations==1.4.23",
