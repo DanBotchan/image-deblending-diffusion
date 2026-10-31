@@ -1,26 +1,13 @@
 from __future__ import annotations
 
-import math
 import statistics
 from typing import Any
 
+from .io import finite_number
 from .models import Issue
 
 
 METRICS = ("psnr", "ssim", "lpips")
-
-
-def _values(rows: list[dict[str, str]], field: str) -> list[float]:
-    values: list[float] = []
-    for row in rows:
-        raw = row.get(field, "")
-        try:
-            value = float(raw)
-        except (TypeError, ValueError):
-            continue
-        if math.isfinite(value):
-            values.append(value)
-    return values
 
 
 def aggregate_metrics(
@@ -31,7 +18,7 @@ def aggregate_metrics(
     for source in ("sample1", "sample2"):
         for metric in METRICS:
             field = f"{source}_{metric}"
-            values = _values(rows, field)
+            values = [value for row in rows if (value := finite_number(row, field)) is not None]
             if len(values) != len(rows):
                 issues.append(
                     Issue(

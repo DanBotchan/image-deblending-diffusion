@@ -39,6 +39,9 @@ class BaseDeblendDiffusion:
                       ref_img: torch.Tensor = None,
                       ) -> None:
 
+        # These diagnostic panels require ground-truth source images.
+        if ref_img is None:
+            return
         general_conf = self.exp_config['general']
         if (idx % general_conf['save_each_steps'] != 0 and
             idx and

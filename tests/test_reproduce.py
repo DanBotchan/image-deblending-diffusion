@@ -131,6 +131,30 @@ def test_auto_prompt_arms_as_run_and_matched(tmp_path):
             if script == "first_stage.py":
                 found[name.split(".")[1]] = Path(cfg["datasets"]["annotations_path"]).name
         return found
-    assert manifests() == {"none": "dataset_random_alpha_map.csv", "auto": "dataset_auto_as_run.csv",
+    assert manifests(legacy_blends=True) == {"none": "dataset_random_alpha_map.csv", "auto": "dataset_auto_as_run.csv",
                            "manual": "dataset_random_alpha_map.csv"}
-    assert manifests(matched_blends=True)["auto"] == "dataset_random_alpha_map_auto.csv"
+    assert manifests()["auto"] == "dataset_random_alpha_map_auto.csv"
+
+
+def test_completion_requires_marker(tmp_path):
+    from paper_repro.experiments import _finished
+    sample = tmp_path / "results/pair_000/smp_0000"
+    sample.mkdir(parents=True)
+    (sample / "sample1.png").touch()
+    assert not _finished(tmp_path, range(1), 1)()
+    (sample / ".complete").touch()
+    assert _finished(tmp_path, range(1), 1)()
+
+
+def test_run_settings_reject_changed_inputs(tmp_path):
+    import json
+    import subprocess
+    import sys
+    out = tmp_path / "comparison/main/known_scalar"
+    out.mkdir(parents=True)
+    (out / "run_settings.json").write_text(json.dumps({"pairs": 1}))
+    result = subprocess.run([sys.executable, str(REPO / "scripts/reproduce.py"), "main",
+                             "--data-root", str(tmp_path), "--output-root", str(tmp_path),
+                             "--pairs", "2", "--dry-run"], capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "Run settings differ" in result.stderr

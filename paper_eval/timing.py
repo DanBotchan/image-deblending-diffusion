@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-import math
 import statistics
 from typing import Any
 
-from .io import group_by_pair
+from .io import finite_number, group_by_pair
 from .models import Issue, ProtocolResult
 
 
 def _time(row: dict[str, str]) -> float | None:
-    try:
-        value = float(row.get("sample_time", ""))
-    except (TypeError, ValueError):
-        return None
-    return value if math.isfinite(value) and value > 0 else None
+    value = finite_number(row, "sample_time")
+    return value if value is not None and value > 0 else None
 
 
 def _stats(values: list[float]) -> dict[str, float]:

@@ -1,6 +1,6 @@
 # Paper experiment map
 
-Every experiment in the paper and supplementary material runs through one driver:
+The pipeline experiments listed below run through one driver:
 
 ```bash
 python scripts/reproduce.py <experiment> --scenario <scenario> --gpus 0,1,2,3
@@ -10,7 +10,7 @@ The driver runs Stage 1, ground-truth-free selection, Stage 2 and evaluation as 
 command lines (`--dry-run` prints them), shards pairs over the listed GPUs, resumes an
 interrupted run, and writes the table as `summary.md`/`summary.csv` under
 `$DEBLEND_OUTPUT_ROOT/<split>/<experiment>/<scenario>/`. `--smoke` runs one pair with ~10x
-fewer steps to check an installation in minutes (its numbers are meaningless).
+fewer steps to check an installation in minutes (its numbers are meaningless). Use a new output root when run settings change. Existing runs created before run-settings tracking need a new output root; only samples with a completion marker are resumed.
 
 | Paper result | Command | Protocol |
 |---|---|---|
@@ -30,6 +30,18 @@ Candidate-budget seeds beyond the ten stored per pair are derived deterministica
 (`paper_repro.experiments.budget_seed`). `auto-prompts` uses the frozen VLM output in
 `manifests/auto_prompts/`; pass `--generate-prompts` to rerun Qwen2-VL instead.
 `scripts/render_timestep_heatmaps.py <timestep summary.csv>` draws the supplementary heatmaps.
+
+## Current-paper audit caveats
+
+The [2026-10-31 audit](REPRODUCIBILITY_AUDIT_2026-10-31.md) found that the current
+supplement also includes alpha-map accuracy and out-of-family matte experiments,
+which do not have release drivers. The current automated-prompt table uses matched blends by default; pass
+`--legacy-blends` for the older as-run variant.
+The candidate-budget table reads sampling-time RGB SSIM / VGG LPIPS, whereas the
+driver's summary uses grayscale SSIM / AlexNet LPIPS, so those summaries do not
+reproduce the table's metric definition. See the audit for sampled evidence and
+fresh-run limitations, including the release’s LPIPS guidance frequency change
+from every guided timestep in the legacy code to every fourth timestep.
 
 ## Canonical method settings
 
@@ -58,8 +70,8 @@ The drivers reproduce what was run. These deviations are therefore encoded expli
 - **Automated prompts**: Stage 1 uses the 80-step/64-start sampler and Stage 2 a fixed alpha.
   As described in the paper, the VLM prompts come from the spatially varying blend, but the
   Auto arm is sampled on the alpha = 0.5 blend of the same pair, while None and Manual use the
-  spatial blends (`manifests/auto_prompts/dataset_auto_as_run.csv`). Add `--matched-blends` to
-  sample all three arms on the same spatial blends, which is the comparison the study intended.
+  spatial blends (`manifests/auto_prompts/dataset_auto_as_run.csv`). The default samples all three arms on the same spatial blends; pass `--legacy-blends`
+  for the older variant.
 - **DoubleDIP best-of-three**: the paper's selection paired outputs with prompts in
   ground-truth source order; see `docs/BASELINES.md` for the flags that reproduce it.
 

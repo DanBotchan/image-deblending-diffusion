@@ -178,6 +178,10 @@ def save_details_json(data_item: Dict[str, Any],
         'smp_seed': smp_seed,
     }
 
+    if 'measurement_path' in data_item:
+        details['measurement_path'] = data_item['measurement_path'][0]
+        details['ground_truth_available'] = False
+
     # Add sample paths if available (Stage 2)
     if 'sample1_path' in data_item:
         details['sample1_path'] = data_item['sample1_path'][0] if isinstance(data_item['sample1_path'], list) else data_item['sample1_path']

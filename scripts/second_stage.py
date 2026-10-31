@@ -54,6 +54,7 @@ def run_pipeline(cfg: Dict[str, Any]) -> None:
     device = torch.device(device_str)
     exp_config = get_config_class(cfg=cfg, device=device)
 
+    input_image = cfg["general"].get("input_image")
     init_seed = set_seed(config=exp_config)
     logger.info(f"Seed is set to: {init_seed}")
     logger.info(f"Device set to {device_str}.")
@@ -79,7 +80,7 @@ def run_pipeline(cfg: Dict[str, Any]) -> None:
 
         if exp_config['general']['skip_finished']:
             if (exp_config.get_path('results', include_smp=True) /
-                    'sample1.png').exists():
+                    '.complete').is_file():
                 continue
 
         alpha_map_gt = create_alpha_map_gt_stage2(exp_config=exp_config,
@@ -104,7 +105,15 @@ def run_pipeline(cfg: Dict[str, Any]) -> None:
 
         ref_img = torch.cat([data_item['image1'], data_item['image2']]).to(device)
         init_smp = torch.cat([data_item['sample1'], data_item['sample2']]).to(device)
-        measurement = reload_from_disk(img=operator(ref_img)[0], device=device)
+        if input_image:
+            from PIL import Image
+            with Image.open(input_image) as image:
+                size = exp_config['datasets']['img_size']
+                measurement = TRANSFORM(image.convert("RGB").resize((size, size))).to(device)
+            ref_img = None
+            data_item["measurement_path"] = [input_image]
+        else:
+            measurement = reload_from_disk(img=operator(ref_img)[0], device=device)
 
         start_time = time.time()
         outputs = sampler.p_sample_loop(
@@ -126,7 +135,7 @@ def run_pipeline(cfg: Dict[str, Any]) -> None:
         results_path = exp_config.get_path('results', include_smp=True)
         results_path.mkdir(exist_ok=True, parents=True)
 
-        metrics = compute_metrics(sample=outputs['sample'], ref_img=ref_img, device=device)
+        metrics = None if input_image else compute_metrics(sample=outputs['sample'], ref_img=ref_img, device=device)
         save_details_json(data_item=data_item,
                           save_to=results_path,
                           sample_time=sample_time,
@@ -137,11 +146,12 @@ def run_pipeline(cfg: Dict[str, Any]) -> None:
                      alpha=alpha_map_pred,
                      measurement=measurement,
                      results_path=results_path)
-        save_alphas_params(gt=alpha_map_gt,
+        save_alphas_params(gt=None if input_image else alpha_map_gt,
                            pred=alpha_map_pred,
                            results_path=results_path,
                            alpha_list=alpha_controller.get_optimizer_states(),
                            init_pred_map=init_alpha_map_pred)
+        (results_path / '.complete').touch()
         alpha_controller.reset_optimizer()
         del alpha_map_pred, alpha_map_gt, init_alpha_map_pred, outputs
         flush()
