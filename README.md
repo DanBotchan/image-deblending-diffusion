@@ -36,7 +36,7 @@ source trees.
 
 ## Method
 
-<img src="assets/method.webp" alt="Pipeline: Stage 1 text-guided latent diffusion produces N candidate decompositions, PickScore selects one, and Stage 2 refines it in pixel space." width="100%">
+<img src="assets/method.webp" alt="Top: Stage 1 text-guided latent diffusion from N seeds, PickScore selects one candidate, Stage 2 refines it in pixel space with alpha fixed. Bottom: the guided step shared by both stages." width="100%">
 
 1. Stage 1 uses Stable Diffusion v1.4 at 512 x 512 for text-guided semantic separation.
 2. Three stochastic candidates are generated with fixed per-pair seeds.
@@ -44,8 +44,9 @@ source trees.
 4. Stage 2 uses OpenAI's unconditional 256 x 256 ImageNet diffusion model for pixel-space refinement.
 5. PSNR, grayscale SSIM, and LPIPS are evaluated after resolving the two-source ordering by minimum total MSE.
 
-Both stages alternate data-consistency updates of the two samples with an update of the alpha
-coefficients every 5 steps. The canonical pipeline takes approximately 50.6--71.0 minutes per
+Both stages use the same guided step: denoise each source, re-blend with the alpha map, and
+update both samples from the data-consistency gradient. Stage 1 also updates the alpha
+coefficients every 5 steps; Stage 2 keeps alpha fixed at the Stage-1 estimate and uses no prompts. The canonical pipeline takes approximately 50.6--71.0 minutes per
 input on one NVIDIA RTX 3090, excluding selector overhead.
 
 ## Results
