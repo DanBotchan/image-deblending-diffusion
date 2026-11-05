@@ -49,7 +49,7 @@ for sub, d in [("stable", "stage1"), ("ddpm", "stage2"), ("ground_truth", "gt"),
         put(f, f"twostage/{d}/{f.stem}")
 
 # Method figure
-page = fitz.open(FIG / "3_method/latest_method_figure_pickscore.pdf")[0]
+page = fitz.open(FIG / "3_method/method_overview_v2.pdf")[0]
 pix = page.get_pixmap(dpi=220)
 tmp = OUT / "method.png"
 pix.save(tmp)

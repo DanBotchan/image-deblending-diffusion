@@ -402,16 +402,16 @@ footer { border-top: 1px solid var(--rule); padding-block: 32px 48px; font-size:
   <div class="section-head">
     <span class="eyebrow">Method</span>
     <h2 id="method-h">A two-stage, training-free pipeline</h2>
-    <p>Both stages run the same joint sampler. Each step alternates a data-consistency update of the two samples (α fixed) with, every k = 5 steps, an update of the α coefficients (samples fixed).</p>
+    <p>Both stages run the same guided step: denoise each source, re-blend with α, and update both samples from the data-consistency gradient. Stage 1 also updates the α coefficients every k = 5 steps; Stage 2 keeps α fixed and uses no prompts.</p>
   </div>
   <figure class="plate" style="margin:0">
-    <img src="static/img/method.webp" alt="Pipeline diagram. Inputs y and prompts c¹, c² enter Stage 1 in latent space, where noisy latents pass through data consistency and alpha optimization. N separated candidates are produced, PickScore chooses the best, and Stage 2 in pixel space refines it into the final outputs." width="2933" height="1650" loading="lazy">
+    <img src="static/img/method.webp" alt="Top row: the blended image y and prompts enter Stage 1 in latent space, which runs from N seeds; PickScore selects one candidate pair, and Stage 2 in pixel space refines it with alpha fixed into the final sources and alpha map. Bottom row: the guided step shared by both stages, where each source is denoised, re-blended with the alpha map, and updated from the data-consistency gradient." width="2934" height="1489" loading="lazy">
   </figure>
   <ol class="steps">
     <li><span class="n">01 · Initialize</span><h3>Start from the blend</h3><p>Encode y, duplicate it into two branches, and add noise to an intermediate step t<sub>s</sub>. The layout of the mixture survives while the branches diverge.</p></li>
-    <li><span class="n">02 · Stage 1</span><h3>Separate semantics</h3><p>Stable Diffusion v1.4 with cross-negative prompting: each branch uses its own prompt as positive and the other's as negative. Consistency with y is enforced in pixel space.</p></li>
+    <li><span class="n">02 · Stage 1</span><h3>Separate semantics</h3><p>Stable Diffusion v1.4 with cross-negative prompting: each branch uses its own prompt as positive and the other's as negative. Consistency with y is enforced in pixel space, and α is optimized alongside the sources.</p></li>
     <li><span class="n">03 · Select</span><h3>Pick a candidate</h3><p>Three seeds give three decompositions. A permutation-invariant PickScore ranking against the prompts picks one, using no ground truth.</p></li>
-    <li><span class="n">04 · Stage 2</span><h3>Refine in pixels</h3><p>Re-noise the selected pair to t<sub>r</sub> &lt; t<sub>s</sub> and resample with a 256 × 256 ImageNet DDPM, recovering texture and correcting VAE artifacts.</p></li>
+    <li><span class="n">04 · Stage 2</span><h3>Refine in pixels</h3><p>Re-noise the selected pair to t<sub>r</sub> &lt; t<sub>s</sub> and resample with a 256 × 256 ImageNet DDPM, unconditional and with α fixed, recovering texture and correcting VAE artifacts.</p></li>
   </ol>
   <p class="fact">The full pipeline takes about 50.6–71.0 minutes per input on one NVIDIA RTX 3090.</p>
 </section>
