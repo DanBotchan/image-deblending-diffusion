@@ -10,6 +10,7 @@ Reichman University, Herzliya, Israel
 <!-- Add Paper and arXiv badges here once the links exist. -->
 [![Project page](https://img.shields.io/badge/Project-page-2f56c9)](https://danbotchan.github.io/image-deblending-diffusion/)
 [![WACV 2027](https://img.shields.io/badge/WACV-2027-a8650a)](#citation)
+[![License](https://img.shields.io/badge/license-Apache--2.0-2e7d32)](LICENSE)
 [![Python 3.9](https://img.shields.io/badge/python-3.9-4e5564)](#installation)
 
 <img src="assets/teaser.png" alt="A blended image of lemons and a cat is separated into the two recovered source images and the recovered alpha map." width="100%">
@@ -236,9 +237,11 @@ OpenAI's [guided-diffusion](https://github.com/openai/guided-diffusion) and
 [PickScore](https://github.com/yuvalkirstain/PickScore). See `THIRD_PARTY_NOTICES.md` for the
 upstream code and licenses.
 
-## License status
+## License
 
-The project-owned code is currently all-rights-reserved until the authors choose an open-source license. Upstream-derived files and pretrained weights retain their own terms. See `LICENSE` and `THIRD_PARTY_NOTICES.md` before redistribution.
+The project-owned code is released under the [Apache License 2.0](LICENSE), copyright 2026 Dan Botchan, Ohad Fried and Yacov Hel-Or (see [`NOTICE`](NOTICE)).
+
+This does not cover third-party-derived source files, pretrained weights (Stable Diffusion v1.4, the OpenAI ImageNet diffusion model, PickScore) or datasets, which keep their own terms. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and `licenses/` before redistributing.
 
 ## Project website
 

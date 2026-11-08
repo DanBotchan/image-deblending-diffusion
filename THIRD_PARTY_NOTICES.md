@@ -17,4 +17,4 @@ This repository contains adapted upstream source and relies on separately downlo
 | `baselines/gip/`, `baselines/lcd/` | Methods of Zou et al. (GIP) and Montenegro & Cardoso (LCD) | Our implementations; no upstream code |
 | 256x256 unconditional ImageNet checkpoint | [OpenAI guided-diffusion](https://github.com/openai/guided-diffusion) | Stage-2 prior |
 
-Applicable license texts recovered so far are stored in `licenses/`. Before a public release, add any remaining upstream notices and verify every adapted file's provenance, and have the copyright holders choose a license for project-owned code. The current root `LICENSE` is deliberately conservative and does not relicense upstream work.
+Applicable license texts recovered so far are stored in `licenses/`. Project-owned code is under Apache-2.0 (root `LICENSE` and `NOTICE`), which does not relicense upstream work. Before relying on a file, verify its provenance and any remaining upstream notices.

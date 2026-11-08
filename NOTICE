@@ -1,0 +1,9 @@
+Image Deblending with Diffusion Models
+Copyright 2026 Dan Botchan, Ohad Fried, Yacov Hel-Or
+
+The project-owned code in this repository is licensed under the Apache License,
+Version 2.0 (see LICENSE).
+
+This does not relicense third-party-derived source files, pretrained model
+weights, or datasets, which keep their own terms. See THIRD_PARTY_NOTICES.md
+and the texts in licenses/.
