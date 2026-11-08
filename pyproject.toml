@@ -7,6 +7,7 @@ name = "diffusion-image-deblending"
 version = "0.1.0"
 description = "Training-free two-source image deblending with diffusion priors"
 readme = "README.md"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.9,<3.11"
 authors = [
   {name = "Dan Botchan"},

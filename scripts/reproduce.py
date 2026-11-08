@@ -22,6 +22,7 @@ resumes an interrupted run.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -53,9 +54,9 @@ def main() -> int:
                         help="selector: existing 3-candidate Stage-1 tree to reuse")
     parser.add_argument("--generate-prompts", action="store_true",
                         help="auto-prompts: rerun Qwen2-VL instead of using the frozen prompts")
-    parser.add_argument("--matched-blends", action="store_true",
-                        help="auto-prompts: sample the Auto arm on the same spatial blends as None/Manual "
-                             "(the paper tables used alpha = 0.5 blends for Auto)")
+    blends = parser.add_mutually_exclusive_group()
+    blends.add_argument("--matched-blends", action="store_true", help="Use matched spatial blends (default)")
+    blends.add_argument("--legacy-blends", action="store_true", help="Use the older mixed-blend protocol")
     parser.add_argument("--offline", action="store_true", help="Load selector/VLM weights from cache only")
     parser.add_argument("--dry-run", action="store_true", help="Print the commands and exit")
     parser.add_argument("--no-table", action="store_true")
@@ -77,9 +78,23 @@ def main() -> int:
                   smoke=args.smoke, pairs=1 if args.smoke else args.pairs, offline=args.offline,
                   frozen_prompts=not args.generate_prompts,
                   extra={"stage1_root": args.stage1_root.resolve() if args.stage1_root else None,
-                         "matched_blends": args.matched_blends})
+                         "legacy_blends": args.legacy_blends})
+    identity = {"experiment": args.experiment, "scenario": scenario, "split": args.split,
+                "data_root": str(ctx.data_root), "pairs": ctx.pairs, "smoke": ctx.smoke,
+                "stage1_root": str(ctx.extra["stage1_root"]) if ctx.extra["stage1_root"] else None,
+                "generate_prompts": args.generate_prompts, "legacy_blends": args.legacy_blends}
+    identity_path = out / "run_settings.json"
+    if identity_path.exists():
+        if json.loads(identity_path.read_text()) != identity:
+            parser.error("Run settings differ from the existing output; use a new --output-root")
+    elif out.exists() and any(out.iterdir()):
+        parser.error("Existing output has no run settings; use a new --output-root")
+    if not args.dry_run:
+        out.mkdir(parents=True, exist_ok=True)
+        identity_path.write_text(json.dumps(identity, indent=2) + "\n")
     phases = builder(ctx, scenario)
-    write_protocol(ctx, args.experiment, scenario, phases)
+    if not args.dry_run:
+        write_protocol(ctx, args.experiment, scenario, phases)
     print(f"{args.experiment} / {scenario} -> {out}")
 
     runner = Runner(out, gpus, dry_run=args.dry_run)

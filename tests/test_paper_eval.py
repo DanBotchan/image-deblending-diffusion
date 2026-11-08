@@ -10,6 +10,7 @@ from PIL import Image
 
 from paper_eval.aggregate import aggregate_metrics
 from paper_eval.artifact_tree import discover_candidates, evaluate_artifact_candidates, evaluate_artifact_tree
+from paper_eval.io import finite_number
 from paper_eval.lineage import validate_stage_lineage
 from paper_eval.models import ExperimentSpec
 from paper_eval.protocols import evaluate_protocol
@@ -33,6 +34,19 @@ def row(pair: str, sample: str, score: float, value: float, time: float, seed: s
     for field in METRIC_FIELDS:
         result[field] = str(value)
     return result
+
+
+class NumericValuesTest(unittest.TestCase):
+    def test_csv_numbers_preserve_zero_and_negative_values(self):
+        for raw, expected in (("0", 0.0), ("-2.5", -2.5), (" 1e2 ", 100.0)):
+            with self.subTest(raw=raw):
+                self.assertEqual(finite_number({"value": raw}, "value"), expected)
+
+    def test_missing_invalid_and_nonfinite_numbers_are_absent(self):
+        self.assertIsNone(finite_number({}, "value"))
+        for raw in (None, "", "invalid", "nan", "inf", "-inf", "1e999"):
+            with self.subTest(raw=raw):
+                self.assertIsNone(finite_number({"value": raw}, "value"))
 
 
 class ProtocolTest(unittest.TestCase):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -10,6 +11,15 @@ from .models import ExperimentSpec, Issue
 
 
 IDENTITY_FIELDS = ("pair", "sample")
+
+
+def finite_number(row: dict[str, str], field: str) -> float | None:
+    """Read a finite CSV number, treating missing or invalid values as absent."""
+    try:
+        value = float(row.get(field, ""))
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
 
 
 def load_manifest(path: Path) -> tuple[Path, list[ExperimentSpec]]:

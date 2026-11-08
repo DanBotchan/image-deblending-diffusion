@@ -68,7 +68,7 @@ def _sampler(steps: int, start: int) -> list[str]:
 
 def _finished(root: Path, pairs: range, samples: int) -> Callable[[], bool]:
     def check() -> bool:
-        return all((root / "results" / f"pair_{p:03d}" / f"smp_{s:04d}" / "sample1.png").is_file()
+        return all((root / "results" / f"pair_{p:03d}" / f"smp_{s:04d}" / ".complete").is_file()
                    for p in pairs for s in range(samples))
     return check
 
@@ -80,7 +80,7 @@ def _rows_finished(root: Path, manifest: Path) -> Callable[[], bool]:
         with manifest.open(newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))
         return bool(rows) and all(
-            (root / "results" / row["pair"] / row["sample"] / "sample1.png").is_file() for row in rows)
+            (root / "results" / row["pair"] / row["sample"] / ".complete").is_file() for row in rows)
     return check
 
 
@@ -361,7 +361,7 @@ def candidate_budget(ctx: Context, scenario: str) -> Phases:
 # Frozen Qwen2-VL prompts (pairs 0-99), written into two manifests:
 #   AS RUN (paper tables): the known-scalar manifest, so the Auto arm is sampled
 #     on alpha = 0.5 blends while None/Manual use the spatial blends;
-#   matched (--matched-blends): the spatial manifest, so all arms share blends.
+#   matched (default): the spatial manifest, so all arms share blends.
 FROZEN_AUTO_PROMPTS = {
     "as_run": REPO / "manifests" / "auto_prompts" / "dataset_auto_as_run.csv",
     "matched": REPO / "manifests" / "auto_prompts" / "dataset_random_alpha_map_auto.csv",
@@ -373,12 +373,12 @@ def automated_prompts(ctx: Context, scenario: str = "spatial") -> Phases:
     """Preliminary Stage-1 study on pairs 0-19 and end-to-end confirmation on 20-99.
 
     AS RUN: Stage 1 used the 80-step/64-start sampler, Stage 2 a fixed alpha, and
-    the Auto arm the alpha = 0.5 blends (prompts still come from the spatial
-    blend). ``matched_blends`` samples the Auto arm on the spatial blends instead.
+    the legacy Auto arm used alpha = 0.5 blends. By default all arms use spatial
+    blends; ``legacy_blends`` selects the older variant.
     """
     root = ctx.out
     manual = ctx.manifest("spatial")
-    variant = "matched" if ctx.extra.get("matched_blends") else "as_run"
+    variant = "as_run" if ctx.extra.get("legacy_blends") else "matched"
     auto = FROZEN_AUTO_PROMPTS[variant] if ctx.frozen_prompts else root / f"auto_prompts_{variant}.csv"
     phases: Phases = []
     if not ctx.frozen_prompts:

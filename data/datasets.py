@@ -135,7 +135,12 @@ class DCBidToolSecondStageDataset(BaseDataset):
             sample1 = self.transform(sample1)
             sample2 = self.transform(sample2)
 
-        alpha_gt = alphas_dict['gt']['parameters']
+        # Real-input inference has no ground-truth alpha; this map is unused
+        # when the stage reads its measurement directly from general.input_image.
+        details = load_json(sample_path / 'details.json')
+        alpha_gt_info = (alphas_dict['pred'] if details.get('ground_truth_available') is False
+                         else alphas_dict['gt'])
+        alpha_gt = alpha_gt_info['parameters']
         alpha_pred = alphas_dict['pred']['parameters']
 
 
@@ -152,7 +157,7 @@ class DCBidToolSecondStageDataset(BaseDataset):
                 'sample2': sample2,
                 'sample2_path': str(sample2_path),
                 'index': index,
-                'alpha_gt_type':  alphas_dict['gt']['type'],
+                'alpha_gt_type': alpha_gt_info['type'],
                 'alpha_gt': alpha_gt,
                 'alpha_pred_type': alphas_dict['pred']['type'],
                 'alpha_pred': alpha_pred,
@@ -162,5 +167,5 @@ class DCBidToolSecondStageDataset(BaseDataset):
                 'assignment_swapped': curr_pair.get('assignment_swapped', False),
                 'pair_idx': int(curr_pair['pair'].split('_')[1]),
                 'smp_idx': int(curr_pair['sample'].split('_')[1]),
-                'details': load_json(str(Path(sample_path) / 'details.json'))
+                'details': details
                 }

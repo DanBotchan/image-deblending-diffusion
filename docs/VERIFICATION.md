@@ -1,5 +1,12 @@
 # Release verification
 
+**Current-paper audit (2026-10-31):** see
+[the sampled reproducibility audit](REPRODUCIBILITY_AUDIT_2026-10-31.md).
+It identifies missing supplementary workflows, evaluation-profile and prompt-blend
+mismatches, and a change from legacy every-step LPIPS guidance to every fourth
+step in the release defaults. The historical spot checks below do not establish
+statistical reproduction of the paper's aggregate scores.
+
 Checks run on this release (one NVIDIA RTX 3090 per job, Python 3.9, PyTorch 2.5.1+cu121).
 
 ## Unit tests

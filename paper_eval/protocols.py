@@ -1,29 +1,16 @@
 from __future__ import annotations
 
-import math
-
-from .io import group_by_pair, read_rows, resolve_artifact_path
+from .io import finite_number, group_by_pair, read_rows, resolve_artifact_path
 from .models import ExperimentSpec, Issue, ProtocolResult
 
 
-def _number(row: dict[str, str], field: str) -> float | None:
-    value = row.get(field, "")
-    if value in ("", None):
-        return None
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return None
-    return parsed if math.isfinite(parsed) else None
-
-
 def _selection_score(row: dict[str, str], field: str) -> float | None:
-    direct = _number(row, field)
+    direct = finite_number(row, field)
     if direct is not None:
         return direct
     if field == "avg_clip_score":
-        first = _number(row, "sample1_clip_score")
-        second = _number(row, "sample2_clip_score")
+        first = finite_number(row, "sample1_clip_score")
+        second = finite_number(row, "sample2_clip_score")
         if first is not None and second is not None:
             return (first + second) / 2.0
     return None
