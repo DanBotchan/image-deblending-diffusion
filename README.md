@@ -8,6 +8,8 @@ Reichman University, Herzliya, Israel
 **WACV 2027**
 
 <!-- Add Paper and arXiv badges here once the links exist. -->
+**Paper and arXiv links: coming soon.**
+
 [![Project page](https://img.shields.io/badge/Project-page-2f56c9)](https://danbotchan.github.io/image-deblending-diffusion/)
 [![WACV 2027](https://img.shields.io/badge/WACV-2027-a8650a)](#citation)
 [![License](https://img.shields.io/badge/license-Apache--2.0-2e7d32)](LICENSE)
@@ -103,6 +105,9 @@ PickScore downloads its pinned model and processor automatically on first use, s
 first run needs internet access. Once cached, pass `--offline` to the driver or custom-image
 command. Further details: [model setup](docs/MODELS.md).
 
+The trained baseline checkpoints (BIDeN, DAD, GIP, LCD) used for Table 1 will be uploaded
+soon; see [baselines](docs/BASELINES.md) for how to retrain them in the meantime.
+
 ## Deblend your own image
 
 No benchmark dataset or source images are needed. Supply the blended image and one short
@@ -160,8 +165,8 @@ For Vehicles/Flowers, use the prepared `BID_generalization` directory and add
 **Dataset availability:** the prepared images are not included in this repository, and
 there is currently no public prepared-data download or script to reconstruct every exact
 pair from the upstream images. The setup command requires an existing prepared dataset.
-Until the prepared data or a complete source mapping is released, new users can run their
-own images using the command above. See [data details](docs/DATA.md).
+The prepared data and a complete source mapping will be uploaded soon. Until then, new users
+can run their own images using the command above. See [data details](docs/DATA.md).
 
 ## Reproduce the paper
 

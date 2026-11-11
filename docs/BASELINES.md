@@ -16,6 +16,8 @@ images to within one intensity level (0 for GIP and LCD).
 | LCD | method of Montenegro & Cardoso (2025) | `baselines/lcd/` (our implementation) | one model |
 | DoubleDIP | [yossigandelsman/DoubleDIP](https://github.com/yossigandelsman/DoubleDIP) @ `4f12629` | `baselines/doubledip/run_doubledip.py` | training-free |
 
+The trained baseline checkpoints are not yet hosted and will be uploaded soon.
+
 The supervised baselines are trained on the BIDeN training set (`BID_train/trainA`,
 `BID_train/trainB`) at 256 x 256. Their evaluation scripts read image paths relative to the
 manifest's directory, so copy the release manifest next to the images first:

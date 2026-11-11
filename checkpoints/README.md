@@ -12,4 +12,4 @@ export DEBLEND_SD14_CKPT=/path/to/sd-v1-4.ckpt
 export DEBLEND_DDPM_CKPT=/path/to/256x256_diffusion_uncond.pt
 ```
 
-Record SHA-256 hashes for the final public release after the authors verify the exact distributed checkpoint files.
+SHA-256 hashes of the verified checkpoint files will be added soon.
