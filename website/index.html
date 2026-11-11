@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Image Deblending with Diffusion Models</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Training-free blind image deblending: recover two source images and the alpha map from a single blended image using pretrained diffusion priors. WACV 2027.">
+<meta property="og:title" content="Image Deblending with Diffusion Models">
+<meta property="og:description" content="Training-free blind deblending with text-guided latent diffusion and pixel-space refinement. WACV 2027.">
+<meta property="og:image" content="static/img/teaser/input.webp">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one centered reading column (~68ch) with wide "light-table" bands for
+   image work. The two source hues encode x¹ (amber) and x² (blue) everywhere. */
+:root {
+  --paper: #f3f4f6;
+  --surface: #ffffff;
+  --ink: #15171c;
+  --ink-2: #4e5564;
+  --rule: #d8dbe1;
+  --src1: #a8650a;
+  --src2: #2f56c9;
+  --accent: #2f56c9;
+  --plate: #ffffff;
+  --shadow: 20 24 32;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --step--1: 0.84rem;
+  --step-0: 1rem;
+  --step-1: 1.2rem;
+  --step-2: 1.6rem;
+  --step-3: clamp(1.9rem, 4.4vw, 2.6rem);
+  --step-4: clamp(2.4rem, 7.2vw, 4.6rem);
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1014; --surface: #171a20; --ink: #e9ebef; --ink-2: #9ca3b0;
+    --rule: #2a2f38; --src1: #e5a943; --src2: #86a4ff; --accent: #86a4ff;
+    --plate: #f4f5f7; --shadow: 0 0 0; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1014; --surface: #171a20; --ink: #e9ebef; --ink-2: #9ca3b0;
+  --rule: #2a2f38; --src1: #e5a943; --src2: #86a4ff; --accent: #86a4ff;
+  --plate: #f4f5f7; --shadow: 0 0 0; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 var(--step-0)/1.62 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+img { max-width: 100%; display: block; }
+a { color: var(--accent); text-underline-offset: 0.18em; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+h2 { font-size: var(--step-3); font-weight: 700; line-height: 1.1; }
+h3 { font-size: var(--step-1); font-weight: 700; line-height: 1.25; }
+p { margin: 0; }
+.mono { font-family: var(--font-mono); }
+.x1 { color: var(--src1); }
+.x2 { color: var(--src2); }
+
+.wrap { max-width: 1120px; margin-inline: auto; }
+.col { max-width: 68ch; }
+section { padding-block: clamp(48px, 8vw, 88px); border-top: 1px solid var(--rule); }
+.eyebrow {
+  font: 500 var(--step--1)/1.2 var(--font-mono);
+  text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-2);
+}
+.section-head { display: grid; gap: 12px; margin-bottom: clamp(24px, 4vw, 40px); }
+.section-head p { color: var(--ink-2); max-width: 64ch; }
+
+/* ---------- Hero ---------- */
+.hero { padding-block: clamp(40px, 7vw, 80px) clamp(32px, 5vw, 56px); display: grid; gap: clamp(28px, 4vw, 44px); }
+.venue {
+  display: inline-flex; align-items: center; gap: 10px; width: fit-content;
+  font: 500 var(--step--1)/1 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-2);
+}
+.venue .dot { width: 22px; height: 12px; position: relative; }
+.venue .dot::before, .venue .dot::after { content: ""; position: absolute; top: 0; width: 12px; height: 12px; border-radius: 50%; mix-blend-mode: multiply; }
+.venue .dot::before { left: 0; background: var(--src1); }
+.venue .dot::after { left: 10px; background: var(--src2); opacity: 0.85; }
+h1 { font-size: var(--step-4); font-weight: 800; line-height: 0.98; letter-spacing: -0.03em; max-width: 15ch; }
+h1 .soft { font-weight: 500; color: var(--ink-2); }
+.authors { display: flex; flex-wrap: wrap; gap: 6px 28px; font-size: var(--step-1); font-weight: 500; }
+.authors a { color: inherit; text-decoration-color: var(--rule); text-decoration-thickness: 2px; }
+.authors a:hover { text-decoration-color: var(--accent); }
+.affil { color: var(--ink-2); margin-top: 6px; }
+.soon-note { color: var(--ink-2); font-size: 0.9rem; margin-top: 14px; max-width: 60ch; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 16px;
+  border-radius: 999px; border: 1px solid var(--ink); color: var(--ink); text-decoration: none;
+  font: 500 0.95rem/1 var(--font-body); background: transparent; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.btn:hover { background: var(--ink); color: var(--paper); }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn[href="#"] { border-style: dashed; color: var(--ink-2); border-color: var(--ink-2); pointer-events: none; }
+.btn[href="#"]::after { content: "soon"; font: 500 0.7rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; opacity: .8; }
+
+/* Deblend stage: three layers stacked at t=0 (the blend y), fanned out at t=1. */
+.stage-band { display: grid; gap: 18px; justify-items: center; }
+.stage {
+  --card: clamp(92px, 27vw, 240px);
+  --gap: clamp(10px, 2.4vw, 30px);
+  --t: 1; --lift: 0;
+  position: relative; width: calc(var(--card) * 3 + var(--gap) * 2); max-width: 100%;
+  height: var(--card);
+}
+.layer {
+  position: absolute; top: 0; left: calc(50% - var(--card) / 2); width: var(--card); aspect-ratio: 1;
+  border-radius: 6px; overflow: hidden; background: var(--surface);
+  box-shadow: 0 calc(4px + var(--lift) * 18px) calc(10px + var(--lift) * 30px) rgb(var(--shadow) / 0.16);
+  will-change: transform;
+}
+.layer img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.layer .top { opacity: var(--t); }
+.layer.l { transform: translate3d(calc((var(--card) + var(--gap)) * -1 * var(--t)), calc(var(--lift) * -10px), 0) rotate(calc(var(--lift) * -2deg)); z-index: 3; }
+.layer.r { transform: translate3d(calc((var(--card) + var(--gap)) * var(--t)), calc(var(--lift) * -10px), 0) rotate(calc(var(--lift) * 2deg)); z-index: 2; }
+.layer.m { z-index: 1; }
+.layer.l { outline: 3px solid color-mix(in srgb, var(--src1) calc(var(--t) * 100%), transparent); outline-offset: -3px; }
+.layer.r { outline: 3px solid color-mix(in srgb, var(--src2) calc(var(--t) * 100%), transparent); outline-offset: -3px; }
+.stage-labels {
+  position: relative; display: grid; grid-template-columns: repeat(3, var(--card)); gap: var(--gap);
+  width: calc(var(--card) * 3 + var(--gap) * 2); max-width: 100%;
+  font-size: var(--step--1); line-height: 1.35; color: var(--ink-2);
+  --card: clamp(92px, 27vw, 240px); --gap: clamp(10px, 2.4vw, 30px);
+}
+.stage-labels > div { opacity: var(--t); min-width: 0; }
+.stage-labels b { display: block; font: 500 var(--step--1)/1.3 var(--font-mono); color: var(--ink); }
+.stage-labels .y-label { position: absolute; inset: 0 0 auto; text-align: center; opacity: calc(1 - var(--t)); }
+.stage-labels .y-label b { display: inline; }
+.scrub { display: flex; align-items: center; gap: 14px; width: min(100%, 520px); }
+.scrub label { font: 500 var(--step--1)/1 var(--font-mono); color: var(--ink-2); white-space: nowrap; }
+.scrub input { flex: 1; min-width: 0; }
+.icon-btn { flex: none; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.icon-btn:hover { border-color: var(--ink); }
+.icon-btn svg { width: 16px; height: 16px; }
+input[type="range"] { accent-color: var(--accent); }
+.stage-caption { font-size: var(--step--1); color: var(--ink-2); text-align: center; max-width: 70ch; }
+
+/* ---------- TL;DR ---------- */
+.ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: clamp(20px, 3vw, 36px); }
+.idea { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.idea .glyph { width: 44px; height: 28px; margin-bottom: 4px; }
+.idea p { color: var(--ink-2); }
+
+/* ---------- Abstract ---------- */
+.abstract { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: clamp(20px, 4vw, 56px); }
+.abstract p { font-size: 1.06rem; max-width: 68ch; }
+@media (max-width: 760px) { .abstract { grid-template-columns: 1fr; } }
+
+/* ---------- Method ---------- */
+.plate { background: var(--plate); border-radius: var(--radius); padding: clamp(10px, 2vw, 22px); border: 1px solid var(--rule); }
+.plate img { width: 100%; height: auto; }
+.steps { list-style: none; margin: clamp(28px, 4vw, 44px) 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0; border-top: 1px solid var(--rule); }
+.steps li { padding: 18px 20px 20px 0; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.steps li + li { padding-left: 20px; border-left: 1px solid var(--rule); }
+.steps .n { font: 500 var(--step--1)/1 var(--font-mono); color: var(--accent); }
+.steps p { color: var(--ink-2); font-size: 0.95rem; }
+@media (max-width: 560px) { .steps li + li { border-left: 0; padding-left: 0; border-top: 1px solid var(--rule); } }
+.fact { margin-top: 20px; font-size: var(--step--1); color: var(--ink-2); }
+
+/* ---------- Forward model playground ---------- */
+.fwd { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 48px); align-items: start; }
+@media (max-width: 860px) { .fwd { grid-template-columns: 1fr; } }
+.formula { font: 400 clamp(0.88rem, 2.2vw, 1.02rem)/1.6 var(--font-mono); background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 14px 16px; overflow-x: auto; white-space: nowrap; }
+.formula .v { color: var(--accent); }
+.sliders { display: grid; grid-template-columns: auto minmax(0, 1fr) 4.2em; gap: 8px 12px; align-items: center; margin-top: 18px; }
+.sliders label { font: 500 0.95rem/1 var(--font-mono); }
+.sliders output { font: 400 var(--step--1)/1 var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.chip { min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); font: 500 0.88rem/1 var(--font-body); cursor: pointer; }
+.chip:hover { border-color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.canvases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.canvases figure { margin: 0; display: grid; gap: 8px; min-width: 0; }
+.canvases canvas { width: 100%; height: auto; aspect-ratio: 1; border-radius: 6px; background: var(--surface); border: 1px solid var(--rule); }
+.canvases figcaption, .cap { font: 400 var(--step--1)/1.35 var(--font-mono); color: var(--ink-2); }
+.srcpair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.srcpair figure { margin: 0; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: center; }
+.srcpair img { border-radius: 4px; }
+
+/* ---------- Shared controls ---------- */
+.controls { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: end; margin-bottom: 22px; }
+.control { display: grid; gap: 8px; min-width: 0; }
+.control > span { font: 500 0.72rem/1 var(--font-mono); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-2); }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 999px; padding: 3px; background: var(--surface); gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--ink-2); min-height: 34px; padding: 0 14px; border-radius: 999px; font: 500 0.9rem/1 var(--font-body); cursor: pointer; }
+.seg button:hover { color: var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+/* ---------- Results explorer ---------- */
+.pairs { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px; margin-bottom: 18px; scrollbar-width: thin; }
+.pairs button { flex: none; width: 92px; padding: 0; border: 0; background: none; cursor: pointer; display: grid; gap: 6px; color: var(--ink-2); font: 400 0.74rem/1.25 var(--font-mono); text-align: left; }
+.pairs img { width: 92px; height: 92px; border-radius: 6px; border: 2px solid transparent; object-fit: cover; }
+.pairs button[aria-pressed="true"] { color: var(--ink); }
+.pairs button[aria-pressed="true"] img { border-color: var(--ink); }
+.grid-scroll { overflow-x: auto; padding-bottom: 6px; }
+.rgrid { display: grid; grid-auto-flow: column; grid-template-rows: auto auto auto; gap: 8px 10px; min-width: max-content; }
+.rgrid .head { font: 600 0.86rem/1.2 var(--font-body); display: flex; align-items: baseline; gap: 6px; padding-bottom: 2px; white-space: nowrap; }
+.rgrid .head small { font: 500 0.66rem/1 var(--font-mono); letter-spacing: .05em; color: var(--ink-2); border: 1px solid var(--rule); border-radius: 4px; padding: 3px 4px; }
+.rgrid .cell { width: clamp(104px, 12vw, 128px); aspect-ratio: 1; position: relative; border-radius: 5px; overflow: hidden; background: var(--surface); }
+.rgrid .cell img { width: 100%; height: 100%; object-fit: cover; }
+.rgrid button.cell { padding: 0; border: 0; cursor: zoom-in; }
+.rgrid .cell .tag { position: absolute; left: 6px; bottom: 6px; font: 500 0.66rem/1 var(--font-mono); background: rgb(0 0 0 / .62); color: #fff; padding: 3px 5px; border-radius: 3px; opacity: 0; transition: opacity .12s; }
+.rgrid .cell.peek .tag { opacity: 1; }
+.rgrid .ours { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rgrid .head.ours-h { color: var(--accent); }
+.rgrid .input-cell { grid-row: 2 / span 2; width: clamp(150px, 18vw, 200px); height: auto; aspect-ratio: 1; align-self: center; margin-right: 10px; }
+.rowlab { font: 500 0.7rem/1 var(--font-mono); color: var(--ink-2); writing-mode: vertical-rl; transform: rotate(180deg); align-self: center; text-transform: uppercase; letter-spacing: .08em; }
+.note { margin-top: 14px; font-size: var(--step--1); color: var(--ink-2); max-width: 75ch; }
+
+/* ---------- Text guidance ---------- */
+.tg { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 18px; align-items: center; }
+.tg .rowname { font: 600 0.9rem/1.25 var(--font-body); width: 9.5em; }
+.tg .rowname small { display: block; font: 400 0.74rem/1.3 var(--font-mono); color: var(--ink-2); }
+.tg .imgs { display: grid; grid-template-columns: repeat(2, minmax(0, 150px)); gap: 10px; }
+.tg .imgs img { border-radius: 5px; aspect-ratio: 1; object-fit: cover; width: 100%; }
+.tg .ours-row .imgs img { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tg-wrap { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: clamp(20px, 4vw, 48px); align-items: start; }
+.tg-ref { display: grid; gap: 10px; }
+.tg-ref .gt { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tg-ref img { border-radius: 5px; }
+@media (max-width: 720px) { .tg-wrap { grid-template-columns: 1fr; } .tg-ref { grid-template-columns: 1fr 1fr; } .tg .rowname { width: 6.5em; } }
+.wslider { display: flex; align-items: center; gap: 12px; }
+.wslider input { width: 180px; max-width: 50vw; }
+.wslider output { font: 500 0.95rem/1 var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- Two-stage swipe ---------- */
+.swipes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: clamp(16px, 3vw, 28px); }
+.swipe { display: grid; gap: 8px; min-width: 0; }
+.swipe .frame { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: var(--surface); touch-action: pan-y; }
+.swipe .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; -webkit-user-drag: none; }
+.swipe .frame .after { clip-path: inset(0 0 0 var(--pos, 50%)); }
+.swipe .handle { position: absolute; top: 0; bottom: 0; left: var(--pos, 50%); width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / .25); pointer-events: none; }
+.swipe .handle::after { content: ""; position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgb(0 0 0 / .35); }
+.swipe .frame .lab { position: absolute; top: 8px; font: 500 0.7rem/1 var(--font-mono); background: rgb(0 0 0 / .6); color: #fff; padding: 4px 6px; border-radius: 3px; pointer-events: none; }
+.swipe .frame .lab.a { left: 8px; } .swipe .frame .lab.b { right: 8px; }
+.swipe input[type="range"] { width: 100%; }
+.swipe .gtline { display: flex; align-items: center; gap: 10px; font: 400 var(--step--1)/1.3 var(--font-mono); color: var(--ink-2); }
+.swipe .gtline img { width: 48px; height: 48px; border-radius: 4px; }
+.ts-input { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+.ts-input img { width: 72px; height: 72px; border-radius: 5px; }
+
+/* ---------- Table ---------- */
+.table-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 10px; text-align: right; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font: 500 0.74rem/1.2 var(--font-mono); letter-spacing: .04em; color: var(--ink-2); border-bottom: 1px solid var(--rule); }
+thead tr:first-child th { font: 600 0.86rem/1.2 var(--font-body); color: var(--ink); letter-spacing: 0; }
+thead .grp { text-align: center; border-left: 1px solid var(--rule); }
+td.g0 { border-left: 1px solid var(--rule); }
+thead th.g0 { border-left: 1px solid var(--rule); }
+tbody td { font-family: var(--font-mono); font-size: 0.86rem; border-top: 1px solid var(--rule); }
+tbody td:first-child { font-family: var(--font-body); font-weight: 500; font-size: 0.92rem; }
+tbody tr.ours td { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+tbody tr.ours td:first-child { color: var(--accent); font-weight: 700; }
+td.best { font-weight: 700; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.tf { font: 500 0.66rem/1 var(--font-mono); border: 1px solid var(--rule); border-radius: 4px; padding: 3px 4px; margin-left: 6px; color: var(--ink-2); vertical-align: 1px; }
+.domain-tag { font: 400 0.7rem/1 var(--font-mono); color: var(--ink-2); display: block; margin-top: 3px; }
+
+/* ---------- BibTeX ---------- */
+.bib { position: relative; }
+.bib pre { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 18px 20px; overflow-x: auto; font: 400 0.88rem/1.6 var(--font-mono); }
+.bib .btn { position: absolute; top: 10px; right: 10px; min-height: 34px; background: var(--surface); }
+.bib .btn:hover { background: var(--ink); }
+
+footer { border-top: 1px solid var(--rule); padding-block: 32px 48px; font-size: var(--step--1); color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div style="display:grid; gap: 22px;">
+    <span class="venue"><span class="dot" aria-hidden="true"></span>WACV 2027</span>
+    <h1>Image Deblending <span class="soft">with Diffusion Models</span></h1>
+    <div>
+      <div class="authors">
+        <span>Dan Botchan</span>
+        <a href="https://www.ohadf.com/">Ohad Fried</a>
+        <a href="https://faculty.runi.ac.il/toky/">Yacov Hel-Or</a>
+      </div>
+      <p class="affil">Reichman University, Herzliya, Israel</p>
+    </div>
+    <nav class="links" aria-label="Paper resources">
+      <!-- Replace "#" with the real URL; a "#" link renders as a dashed "soon" button. -->
+      <a class="btn" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 1.5h5.5L13 5v9.5H4z"/><path d="M9.5 1.5V5H13"/></svg>Paper</a>
+      <a class="btn" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 2.5h10v11H3z"/><path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3"/></svg>Supplementary</a>
+      <a class="btn" href="https://github.com/DanBotchan/image-deblending-diffusion"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 .2a8 8 0 0 0-2.5 15.6c.4 0 .5-.2.5-.4v-1.5c-2.2.5-2.7-1-2.7-1-.4-.9-.9-1.2-.9-1.2-.7-.5.1-.5.1-.5.8.1 1.2.8 1.2.8.7 1.3 1.9.9 2.4.7 0-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-4 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.4 7.4 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.4 1.1.2 1.9.1 2.1.5.6.8 1.3.8 2.1 0 3.1-1.9 3.8-3.6 4 .3.3.5.8.5 1.5v2.2c0 .2.1.5.6.4A8 8 0 0 0 8 .2z"/></svg>Code</a>
+      <a class="btn" href="#"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 13.5l4-11 3 7 2-3 2 7"/></svg>arXiv</a>
+      <a class="btn" href="#bibtex"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 3.5h4v4H4.5L3 10zM9 3.5h4v4h-2.5L9 10z"/></svg>BibTeX</a>
+    </nav>
+    <p class="soon-note">Paper, supplementary and arXiv links are coming soon. The prepared dataset and the trained baseline checkpoints will be uploaded soon.</p>
+  </div>
+
+  <div class="stage-band">
+    <div class="stage" id="stage" role="img" aria-label="A blended image of lemons and a cat separates into the two recovered source images and the recovered alpha map.">
+      <div class="layer m"><img src="static/img/teaser/input.webp" alt=""><img class="top" src="static/img/teaser/alpha_pred.webp" alt=""></div>
+      <div class="layer r"><img src="static/img/teaser/input.webp" alt=""><img class="top" src="static/img/teaser/rec2.webp" alt=""></div>
+      <div class="layer l"><img src="static/img/teaser/input.webp" alt=""><img class="top" src="static/img/teaser/rec1.webp" alt=""></div>
+    </div>
+    <div class="stage-labels" id="stage-labels">
+      <div><b class="x1">x̃¹ recovered</b>“Lemons on the shelf in the supermarket”</div>
+      <div style="text-align:center"><b>α̃ recovered</b>polynomial map, 6 parameters</div>
+      <div style="text-align:right"><b class="x2">x̃² recovered</b>“A tiger facing the camera”</div>
+      <p class="y-label"><b>y</b> the blended input, all we observe</p>
+    </div>
+    <div class="scrub">
+      <button class="icon-btn" id="replay" type="button" aria-label="Replay separation"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg></button>
+      <label for="deblend-t">blended</label>
+      <input id="deblend-t" type="range" min="0" max="1000" value="1000" aria-label="Separation amount">
+      <label for="deblend-t">separated</label>
+    </div>
+    <p class="stage-caption">One blended image in, two images and the blending map out. Drag to separate. The method is given only <span class="mono">y</span> and one text prompt per source; it never sees the sources or the map.</p>
+  </div>
+</header>
+
+<!-- ================= TL;DR ================= -->
+<section aria-labelledby="tldr-h">
+  <div class="section-head"><span class="eyebrow" id="tldr-h">In short</span></div>
+  <div class="ideas">
+    <div class="idea">
+      <svg class="glyph" viewBox="0 0 44 28" aria-hidden="true"><circle cx="14" cy="14" r="12" fill="var(--src1)" opacity=".9"/><circle cx="30" cy="14" r="12" fill="var(--src2)" opacity=".75"/></svg>
+      <h3>Two images from one prior</h3>
+      <p>Deblending becomes a joint inverse problem. Diffusion posterior sampling recovers both full source images and the alpha map together, from a single pretrained model.</p>
+    </div>
+    <div class="idea">
+      <svg class="glyph" viewBox="0 0 44 28" aria-hidden="true"><rect x="2" y="6" width="18" height="16" rx="3" fill="none" stroke="var(--src1)" stroke-width="2.5"/><rect x="24" y="6" width="18" height="16" rx="3" fill="none" stroke="var(--src2)" stroke-width="2.5"/><path d="M7 14h8M29 14h8" stroke="var(--ink-2)" stroke-width="2"/></svg>
+      <h3>Prompts settle the ambiguity</h3>
+      <p>One blend has many valid splits. A short text prompt per source, used with cross-negative guidance, tells the sampler which content belongs where.</p>
+    </div>
+    <div class="idea">
+      <svg class="glyph" viewBox="0 0 44 28" aria-hidden="true"><g fill="var(--ink-2)"><rect x="2" y="8" width="12" height="12" opacity=".35"/></g><g fill="var(--ink)"><rect x="26" y="8" width="3" height="3"/><rect x="30" y="8" width="3" height="3" opacity=".6"/><rect x="34" y="8" width="3" height="3"/><rect x="26" y="12" width="3" height="3" opacity=".6"/><rect x="30" y="12" width="3" height="3"/><rect x="34" y="12" width="3" height="3" opacity=".6"/><rect x="26" y="16" width="3" height="3"/><rect x="30" y="16" width="3" height="3" opacity=".6"/><rect x="34" y="16" width="3" height="3"/></g><path d="M16 14h7" stroke="var(--ink-2)" stroke-width="2"/></svg>
+      <h3>Coarse in latent space, fine in pixels</h3>
+      <p>Stable Diffusion separates the semantics at 512 × 512. A pixel-space ImageNet diffusion model then restores texture and removes VAE artifacts at 256 × 256.</p>
+    </div>
+    <div class="idea">
+      <svg class="glyph" viewBox="0 0 44 28" aria-hidden="true"><rect x="2" y="9" width="10" height="10" rx="2" fill="var(--rule)"/><rect x="17" y="5" width="10" height="18" rx="2" fill="var(--accent)"/><rect x="32" y="9" width="10" height="10" rx="2" fill="var(--rule)"/></svg>
+      <h3>No training, no ground truth</h3>
+      <p>Nothing is fine-tuned. Three candidate decompositions are sampled and PickScore picks one, so the whole pipeline runs without any reference images.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ABSTRACT ================= -->
+<section class="abstract" aria-labelledby="abs-h">
+  <div><h2 id="abs-h">Abstract</h2></div>
+  <p>Image deblending is the task of decomposing a composite image back into its source images, which is an ill-posed problem, as a single blended image can be decomposed into multiple plausible source layers. While diffusion models are often used to solve inverse problems, they typically address single-output reconstruction problems. In this work, we formulate deblending as a joint inverse problem, employing diffusion posterior sampling to simultaneously reconstruct two source images, demonstrating that a single diffusion prior is expressive enough to disentangle two full images at once rather than just one. Drawing inspiration from human perception, where semantic understanding helps disentangle visual inconsistencies, we propose a training-free framework that leverages text prompts to constrain this solution space. We address the blind deblending task through a two-stage architecture: text-guided latent diffusion performs semantic separation using prompts as high-level cues, followed by a pixel-space refinement to recover fine details. Stochastic sampling produces multiple plausible decompositions that can be ranked without ground truth. Extensive experiments show that our training-free method achieves state-of-the-art results on unseen domains and extends to spatially-varying alpha maps, while remaining competitive with supervised baselines on standard scalar blending benchmarks.</p>
+</section>
+
+<!-- ================= FORWARD MODEL ================= -->
+<section aria-labelledby="fwd-h">
+  <div class="section-head">
+    <span class="eyebrow">The forward model</span>
+    <h2 id="fwd-h">Six numbers describe the blend</h2>
+    <p>The observed image is a per-pixel mix of two sources. Instead of a free value per pixel, which could encode edges, the alpha map is a smooth second-order polynomial over normalized coordinates. The sampler estimates these six coefficients along with the two images. Try them here on the teaser sources.</p>
+  </div>
+  <div class="fwd">
+    <div>
+      <div class="formula" aria-label="Blending equation">
+        y = α ⊙ <span class="x1">x¹</span> + (1 − α) ⊙ <span class="x2">x²</span><br>
+        α(ū, v̄) = <span class="v" data-c="0">a</span> + <span class="v" data-c="1">b</span>ū + <span class="v" data-c="2">c</span>v̄ + <span class="v" data-c="3">d</span>ūv̄ + <span class="v" data-c="4">e</span>ū² + <span class="v" data-c="5">f</span>v̄²
+      </div>
+      <div class="sliders" id="sliders"></div>
+      <div class="presets" id="presets" role="group" aria-label="Alpha presets"></div>
+    </div>
+    <div>
+      <div class="canvases">
+        <figure><canvas id="cv-alpha" width="256" height="256" aria-label="Alpha map"></canvas><figcaption>α map (white = <span class="x1">x¹</span>, clipped to [0, 1])</figcaption></figure>
+        <figure><canvas id="cv-blend" width="256" height="256" aria-label="Blended result"></canvas><figcaption>y, the blended image</figcaption></figure>
+      </div>
+      <div class="srcpair">
+        <figure><img src="static/img/teaser/src1.webp" alt="Source 1: lemons" width="56" height="56"><span class="cap"><span class="x1">x¹</span> source 1</span></figure>
+        <figure><img src="static/img/teaser/src2.webp" alt="Source 2: cat" width="56" height="56"><span class="cap"><span class="x2">x²</span> source 2</span></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= METHOD ================= -->
+<section aria-labelledby="method-h">
+  <div class="section-head">
+    <span class="eyebrow">Method</span>
+    <h2 id="method-h">A two-stage, training-free pipeline</h2>
+    <p>Both stages run the same guided step: denoise each source, re-blend with α, and update both samples from the data-consistency gradient. Stage 1 also updates the α coefficients every k = 5 steps; Stage 2 keeps α fixed and uses no prompts.</p>
+  </div>
+  <figure class="plate" style="margin:0">
+    <img src="static/img/method.webp" alt="Top row: the blended image y and prompts enter Stage 1 in latent space, which runs from N seeds; PickScore selects one candidate pair, and Stage 2 in pixel space refines it with alpha fixed into the final sources and alpha map. Bottom row: the guided step shared by both stages, where each source is denoised, re-blended with the alpha map, and updated from the data-consistency gradient." width="2934" height="1489" loading="lazy">
+  </figure>
+  <ol class="steps">
+    <li><span class="n">01 · Initialize</span><h3>Start from the blend</h3><p>Encode y, duplicate it into two branches, and add noise to an intermediate step t<sub>s</sub>. The layout of the mixture survives while the branches diverge.</p></li>
+    <li><span class="n">02 · Stage 1</span><h3>Separate semantics</h3><p>Stable Diffusion v1.4 with cross-negative prompting: each branch uses its own prompt as positive and the other's as negative. Consistency with y is enforced in pixel space, and α is optimized alongside the sources.</p></li>
+    <li><span class="n">03 · Select</span><h3>Pick a candidate</h3><p>Three seeds give three decompositions. A permutation-invariant PickScore ranking against the prompts picks one, using no ground truth.</p></li>
+    <li><span class="n">04 · Stage 2</span><h3>Refine in pixels</h3><p>Re-noise the selected pair to t<sub>r</sub> &lt; t<sub>s</sub> and resample with a 256 × 256 ImageNet DDPM, unconditional and with α fixed, recovering texture and correcting VAE artifacts.</p></li>
+  </ol>
+  <p class="fact">The full pipeline takes about 50.6–71.0 minutes per input on one NVIDIA RTX 3090.</p>
+</section>
+
+<!-- ================= RESULTS EXPLORER ================= -->
+<section aria-labelledby="res-h">
+  <div class="section-head">
+    <span class="eyebrow">Qualitative results</span>
+    <h2 id="res-h">Compare against every baseline</h2>
+    <p>Pick a domain, a blending scenario and a pair. Press and hold any result to see the ground truth in its place.</p>
+  </div>
+  <div class="controls">
+    <div class="control"><span id="lab-dom">Domain</span><div class="seg" id="seg-dom" role="group" aria-labelledby="lab-dom"></div></div>
+    <div class="control"><span id="lab-sc">Blending scenario</span><div class="seg" id="seg-sc" role="group" aria-labelledby="lab-sc"></div></div>
+  </div>
+  <div class="pairs" id="pairs" role="group" aria-label="Image pair"></div>
+  <div class="grid-scroll"><div class="rgrid" id="rgrid"></div></div>
+  <p class="note" id="res-note"></p>
+</section>
+
+<!-- ================= TEXT GUIDANCE ================= -->
+<section aria-labelledby="tg-h">
+  <div class="section-head">
+    <span class="eyebrow">Ablation · text guidance</span>
+    <h2 id="tg-h">Cross-negative prompts keep the sources apart</h2>
+    <p>Standard classifier-free guidance pulls each branch toward its prompt. Using the other source's prompt as the negative also pushes it away from the wrong content. Raise the guidance strength ω to compare the three strategies.</p>
+  </div>
+  <div class="controls">
+    <div class="control"><span id="lab-tgp">Pair</span><div class="seg" id="seg-tgp" role="group" aria-labelledby="lab-tgp"></div></div>
+    <div class="control"><span>Guidance strength</span><div class="wslider"><input id="tg-w" type="range" min="0" max="3" step="1" value="2" aria-label="Guidance strength omega"><output id="tg-w-out" for="tg-w">ω = 2.0</output></div></div>
+  </div>
+  <div class="tg-wrap">
+    <div class="tg-ref">
+      <figure style="margin:0; display:grid; gap:6px"><img id="tg-input" src="" alt="Blended input" width="220" height="220"><span class="cap">input y</span></figure>
+      <figure style="margin:0; display:grid; gap:6px"><div class="gt"><img id="tg-gt1" src="" alt="Ground truth source 1" width="106" height="106"><img id="tg-gt2" src="" alt="Ground truth source 2" width="106" height="106"></div><span class="cap">ground truth</span></figure>
+    </div>
+    <div class="tg" id="tg-rows"></div>
+  </div>
+</section>
+
+<!-- ================= TWO STAGE ================= -->
+<section aria-labelledby="ts-h">
+  <div class="section-head">
+    <span class="eyebrow">Ablation · two stages</span>
+    <h2 id="ts-h">What the pixel stage adds</h2>
+    <p>Stage 1 gets the content right but loses detail through the VAE. Drag the divider to compare its output with the Stage 2 refinement of the same sample.</p>
+  </div>
+  <div class="controls">
+    <div class="control"><span id="lab-ts">Pair</span><div class="seg" id="seg-ts" role="group" aria-labelledby="lab-ts"></div></div>
+  </div>
+  <div class="ts-input"><img id="ts-input" src="" alt="Blended input" width="72" height="72"><span class="cap">input y</span></div>
+  <div class="swipes" id="swipes"></div>
+</section>
+
+<!-- ================= TABLE ================= -->
+<section aria-labelledby="tab-h">
+  <div class="section-head">
+    <span class="eyebrow">Quantitative results</span>
+    <h2 id="tab-h">Best on unseen domains, competitive on seen ones</h2>
+    <p>Fruits and Animals are the domains the supervised baselines were trained on; Vehicles and Flowers are held out. <span class="mono">TF</span> marks training-free methods. Ours and DoubleDIP each draw three candidates and select one with PickScore, without ground truth. The best value per column is underlined.</p>
+  </div>
+  <div class="controls">
+    <div class="control"><span id="lab-tab">Blending scenario</span><div class="seg" id="seg-tab" role="group" aria-labelledby="lab-tab"></div></div>
+  </div>
+  <div class="table-scroll"><table id="table" aria-labelledby="tab-h"></table></div>
+</section>
+
+<!-- ================= BIBTEX ================= -->
+<section id="bibtex" aria-labelledby="bib-h">
+  <div class="section-head"><h2 id="bib-h">Citation</h2></div>
+  <div class="bib">
+    <pre id="bib-text">@inproceedings{botchan2027deblending,
+  title     = {Image Deblending with Diffusion Models},
+  author    = {Botchan, Dan and Fried, Ohad and Hel-Or, Yacov},
+  booktitle = {Proceedings of the IEEE/CVF Winter Conference on
+               Applications of Computer Vision (WACV)},
+  year      = {2027}
+}</pre>
+    <button class="btn" id="copy-bib" type="button">Copy</button>
+  </div>
+</section>
+
+<footer>
+  <span>Image Deblending with Diffusion Models · WACV 2027</span>
+  <span>Contact: <span class="mono">dan.botchan@post.runi.ac.il</span></span>
+</footer>
+</div>
+
+<script>
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const $ = (id) => document.getElementById(id);
+  // Image URL for a path under static/img/ (SITE_ASSETS lets a bundled copy inline them).
+  const IMG = (p) => (window.SITE_ASSETS && window.SITE_ASSETS[p]) || "static/img/" + p;
+  const el = (tag, attrs = {}, kids = []) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "text") n.textContent = v; else if (k === "html") n.innerHTML = v; else n.setAttribute(k, v);
+    }
+    for (const k of [].concat(kids)) if (k) n.append(k);
+    return n;
+  };
+  // Single-choice segmented control; calls onPick(value) on change.
+  const segmented = (root, options, current, onPick) => {
+    root.replaceChildren();
+    for (const [value, label] of options) {
+      const b = el("button", { type: "button", "aria-pressed": String(value === current), text: label });
+      b.addEventListener("click", () => {
+        for (const x of root.children) x.setAttribute("aria-pressed", "false");
+        b.setAttribute("aria-pressed", "true");
+        onPick(value);
+      });
+      root.append(b);
+    }
+  };
+
+  /* ---------- Hero deblend stage ---------- */
+  const stage = $("stage"), labels = $("stage-labels"), tInput = $("deblend-t");
+  const setT = (t) => {
+    const lift = Math.sin(Math.PI * t);
+    for (const n of [stage, labels]) { n.style.setProperty("--t", t.toFixed(4)); n.style.setProperty("--lift", lift.toFixed(4)); }
+    tInput.value = Math.round(t * 1000);
+  };
+  let raf = 0;
+  const play = () => {
+    cancelAnimationFrame(raf);
+    if (reduce) { setT(1); return; }
+    const t0 = performance.now(), hold = 500, dur = 1700;
+    const ease = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    const step = (now) => {
+      const x = Math.min(1, Math.max(0, (now - t0 - hold) / dur));
+      setT(ease(x));
+      if (x < 1) raf = requestAnimationFrame(step);
+    };
+    setT(0);
+    raf = requestAnimationFrame(step);
+  };
+  tInput.addEventListener("input", () => { cancelAnimationFrame(raf); setT(tInput.value / 1000); });
+  $("replay").addEventListener("click", play);
+  play();
+
+  /* ---------- Forward model playground ---------- */
+  const names = ["a", "b", "c", "d", "e", "f"];
+  const presets = [
+    ["Teaser", [0.3155, 0.6744, 0.0153, -1.1222, -0.3486, 0.6124]],
+    ["Constant", [0.5, 0, 0, 0, 0, 0]],
+    ["Left to right", [1, -1, 0, 0, 0, 0]],
+    ["Top to bottom", [0, 0, 1, 0, 0, 0]],
+    ["Spotlight", [0, 2, 2, 0, -2, -2]],
+  ];
+  let coef = presets[0][1].slice();
+  const sliders = $("sliders"), presetRoot = $("presets"), outs = [], ranges = [];
+  names.forEach((n, i) => {
+    const id = "coef-" + n;
+    const r = el("input", { type: "range", id, min: "-2.5", max: "2.5", step: "0.01", value: String(coef[i]) });
+    const o = el("output", { for: id });
+    sliders.append(el("label", { for: id, text: n }), r, o);
+    r.addEventListener("input", () => { coef[i] = +r.value; markPreset(-1); draw(); });
+    outs.push(o); ranges.push(r);
+  });
+  const markPreset = (k) => [...presetRoot.children].forEach((b, j) => b.setAttribute("aria-pressed", String(j === k)));
+  presets.forEach(([label, vals], k) => {
+    const b = el("button", { type: "button", class: "chip", "aria-pressed": String(k === 0), text: label });
+    b.addEventListener("click", () => { coef = vals.slice(); ranges.forEach((r, i) => r.value = coef[i]); markPreset(k); draw(); });
+    presetRoot.append(b);
+  });
+  const cvA = $("cv-alpha"), cvB = $("cv-blend"), ctxA = cvA.getContext("2d"), ctxB = cvB.getContext("2d");
+  const W = 256, H = 256;
+  let px1 = null, px2 = null;
+  const loadPixels = (src) => new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => { const c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d"); x.drawImage(im, 0, 0, W, H); try { res(x.getImageData(0, 0, W, H).data); } catch (e) { rej(e); } };
+    im.onerror = rej; im.src = src;
+  });
+  const imgA = ctxA.createImageData(W, H), imgB = ctxB.createImageData(W, H);
+  function draw() {
+    outs.forEach((o, i) => o.textContent = coef[i].toFixed(2));
+    // Rebuild the polynomial text with the live coefficients and their signs.
+    const f = document.querySelector(".formula");
+    const [a, b, c, d, e, g] = coef;
+    const term = (v, s) => ` ${v >= 0 ? "+" : "−"} <span class="v">${Math.abs(v).toFixed(2)}</span>${s}`;
+    f.innerHTML = `y = α ⊙ <span class="x1">x¹</span> + (1 − α) ⊙ <span class="x2">x²</span><br>α(ū, v̄) = <span class="v">${a.toFixed(2)}</span>${term(b, "ū")}${term(c, "v̄")}${term(d, "ūv̄")}${term(e, "ū²")}${term(g, "v̄²")}`;
+    const A = imgA.data, B = imgB.data;
+    for (let y = 0; y < H; y++) {
+      const v = y / (H - 1);
+      for (let x = 0; x < W; x++) {
+        const u = x / (W - 1);
+        let al = a + b * u + c * v + d * u * v + e * u * u + g * v * v;
+        al = al < 0 ? 0 : al > 1 ? 1 : al;
+        const p = (y * W + x) * 4, q = Math.round(al * 255);
+        A[p] = A[p + 1] = A[p + 2] = q; A[p + 3] = 255;
+        if (px1) {
+          B[p] = al * px1[p] + (1 - al) * px2[p];
+          B[p + 1] = al * px1[p + 1] + (1 - al) * px2[p + 1];
+          B[p + 2] = al * px1[p + 2] + (1 - al) * px2[p + 2];
+          B[p + 3] = 255;
+        }
+      }
+    }
+    ctxA.putImageData(imgA, 0, 0);
+    if (px1) ctxB.putImageData(imgB, 0, 0);
+  }
+  draw();
+  Promise.all([loadPixels(IMG("teaser/src1.webp")), loadPixels(IMG("teaser/src2.webp"))])
+    .then(([p1, p2]) => { px1 = p1; px2 = p2; draw(); })
+    .catch(() => { const im = new Image(); im.onload = () => ctxB.drawImage(im, 0, 0, W, H); im.src = IMG("teaser/input.webp"); });
+
+  /* ---------- Results explorer ---------- */
+  const DOMAINS = {
+    seen: { label: "Seen · Fruits × Animals", pairs: [
+      ["market-pigeons", "market", "pigeons", "Market × Pigeons"],
+      ["redberries-fox", "redberries", "fox", "Redberries × Fox"],
+      ["strawberry-girrafe", "strawberry", "girrafe", "Strawberry × Giraffe"],
+      ["straweberry2-squirrel", "straweberry2", "squirrel", "Strawberry × Squirrel"],
+      ["fruit-duck", "fruit", "duck", "Fruit × Duck"],
+      ["strawberries-cat", "strawberries", "cat", "Strawberries × Cat"],
+    ] },
+    unseen: { label: "Unseen · Vehicles × Flowers", pairs: [
+      ["lego-purple-flower", "lego", "purple-flower", "Lego × Purple flower"],
+      ["gray-car-pink-flower", "gray-car", "pink-flower", "Gray car × Pink flower"],
+      ["police-wflower", "police", "wflower", "Police car × White flower"],
+      ["tank-pflower", "tank", "pflower", "Tank × Pink flower"],
+    ] },
+  };
+  const SCEN = [["ks", "Known scalar α"], ["us", "Unknown scalar α"], ["sv", "Spatially varying α"]];
+  const METHODS = [
+    ["Ours", "Ours", true], ["BIDeN", "BIDeN", false], ["LCD", "LCD", false],
+    ["DAD", "DAD", false], ["GIP", "GIP", false], ["DoubleDIP", "DoubleDIP", true],
+  ];
+  const res = { dom: "seen", sc: "ks", pair: 0 };
+  const path = (m, n) => IMG(`results/${res.dom}/${res.sc}/${m}/${n}.webp`);
+
+  function renderPairs() {
+    const root = $("pairs"); root.replaceChildren();
+    DOMAINS[res.dom].pairs.forEach(([file, , , label], i) => {
+      const b = el("button", { type: "button", "aria-pressed": String(i === res.pair) }, [
+        el("img", { src: path("input", file), alt: "", width: "92", height: "92", loading: "lazy" }),
+        el("span", { text: label }),
+      ]);
+      b.addEventListener("click", () => { res.pair = i; renderPairs(); renderGrid(); });
+      root.append(b);
+    });
+  }
+  function peekable(src, gtSrc, label, cls) {
+    const b = el("button", { type: "button", class: "cell " + (cls || ""), "aria-label": `${label}. Hold to show ground truth.` }, [
+      el("img", { src, alt: label, width: "128", height: "128", loading: "lazy" }),
+      el("span", { class: "tag", text: "ground truth" }),
+    ]);
+    const img = b.firstChild;
+    const on = () => { img.src = gtSrc; b.classList.add("peek"); };
+    const off = () => { img.src = src; b.classList.remove("peek"); };
+    b.addEventListener("pointerdown", on);
+    for (const ev of ["pointerup", "pointerleave", "pointercancel", "blur"]) b.addEventListener(ev, off);
+    b.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); on(); } });
+    b.addEventListener("keyup", (e) => { if (e.key === " " || e.key === "Enter") off(); });
+    b.addEventListener("contextmenu", (e) => e.preventDefault());
+    return b;
+  }
+  function renderGrid() {
+    const g = $("rgrid"); g.replaceChildren();
+    const [file, s1, s2, label] = DOMAINS[res.dom].pairs[res.pair];
+    // Column: row labels
+    g.append(el("div"), el("div", { class: "rowlab x1", text: "source 1" }), el("div", { class: "rowlab x2", text: "source 2" }));
+    // Column: input (spans both rows)
+    g.append(el("div", { class: "head", text: "Input y" }));
+    const inp = el("div", { class: "cell input-cell" }, [el("img", { src: path("input", file), alt: `Blended input: ${label}`, width: "200", height: "200" })]);
+    g.append(inp);
+    // Column: ground truth
+    g.append(el("div", { class: "head", text: "Ground truth" }));
+    for (const s of [s1, s2]) g.append(el("div", { class: "cell" }, [el("img", { src: path("ground_truth", s), alt: `Ground truth ${s}`, width: "128", height: "128", loading: "lazy" })]));
+    for (const [dir, name, tf] of METHODS) {
+      if (res.sc !== "ks" && (dir === "LCD" || dir === "GIP")) continue;
+      const isOurs = dir === "Ours";
+      const h = el("div", { class: "head" + (isOurs ? " ours-h" : "") }, [document.createTextNode(name)]);
+      if (tf) h.append(el("small", { text: "TF" }));
+      g.append(h);
+      for (const s of [s1, s2]) g.append(peekable(path(dir, s), path("ground_truth", s), `${name}, ${s}`, isOurs ? "ours" : ""));
+    }
+    $("res-note").textContent = res.sc === "ks"
+      ? "Known scalar: the blending weight is a single number given to every method."
+      : res.sc === "us"
+        ? "Unknown scalar: one blending weight, which each method must estimate. LCD and GIP are evaluated only in the known-scalar setting."
+        : "Spatially varying: the blending weight changes across the image and must be estimated. LCD and GIP are evaluated only in the known-scalar setting.";
+  }
+  segmented($("seg-dom"), Object.entries(DOMAINS).map(([k, v]) => [k, v.label]), res.dom, (v) => { res.dom = v; res.pair = 0; renderPairs(); renderGrid(); });
+  segmented($("seg-sc"), SCEN, res.sc, (v) => { res.sc = v; renderPairs(); renderGrid(); });
+  renderPairs(); renderGrid();
+
+  /* ---------- Text guidance ---------- */
+  const TGP = { "apples-cat": ["apples", "cat", "Apples × Cat"], "fruits-kangaro": ["fruits", "kangaro", "Fruits × Kangaroo"] };
+  const TGM = [["cross", "Cross-negative", "ours: other prompt as negative"], ["cfg", "Standard CFG", "no negative prompt"], ["classes", "Class-level", "class names as prompts"]];
+  const tg = { pair: "apples-cat", w: 2 };
+  function renderTG() {
+    const [a, b] = TGP[tg.pair];
+    $("tg-input").src = IMG(`text/input/${tg.pair}.webp`);
+    $("tg-gt1").src = IMG(`text/gt/${a}.webp`);
+    $("tg-gt2").src = IMG(`text/gt/${b}.webp`);
+    const rows = $("tg-rows"); rows.replaceChildren();
+    for (const [dir, name, sub] of TGM) {
+      const row = el("div", { class: "rowname" }, [document.createTextNode(name), el("small", { text: sub })]);
+      const imgs = el("div", { class: "imgs" }, [a, b].map((n) => el("img", { src: IMG(`text/${dir}/${tg.w}/${n}.webp`), alt: `${name}, ω = ${tg.w}, ${n}`, width: "150", height: "150" })));
+      const wrap = el("div", { style: "display:contents", class: dir === "cross" ? "ours-row" : "" });
+      // display:contents keeps the 2-column grid; the class targets the images.
+      wrap.append(row, imgs);
+      rows.append(wrap);
+    }
+    $("tg-w-out").textContent = `ω = ${tg.w}.0`;
+  }
+  segmented($("seg-tgp"), Object.entries(TGP).map(([k, v]) => [k, v[2]]), tg.pair, (v) => { tg.pair = v; renderTG(); });
+  $("tg-w").addEventListener("input", (e) => { tg.w = +e.target.value; renderTG(); });
+  renderTG();
+
+  /* ---------- Two-stage swipe ---------- */
+  const TS = { "fruits_chicken": ["fruits", "chicken", "Fruits × Chicken"], "market_bull": ["market", "bull", "Market × Bull"] };
+  let tsPair = "fruits_chicken";
+  function renderTS() {
+    const [a, b] = TS[tsPair];
+    $("ts-input").src = IMG(`twostage/input/${tsPair}.webp`);
+    const root = $("swipes"); root.replaceChildren();
+    [[a, "x1", "source 1"], [b, "x2", "source 2"]].forEach(([n, cls, lab]) => {
+      const id = "swipe-" + n;
+      const frame = el("div", { class: "frame" }, [
+        el("img", { src: IMG(`twostage/stage1/${n}.webp`), alt: `Stage 1 output, ${n}`, width: "256", height: "256" }),
+        el("img", { class: "after", src: IMG(`twostage/stage2/${n}.webp`), alt: `Stage 2 output, ${n}`, width: "256", height: "256" }),
+        el("div", { class: "handle" }),
+        el("span", { class: "lab a", text: "Stage 1" }),
+        el("span", { class: "lab b", text: "Stage 2" }),
+      ]);
+      const range = el("input", { type: "range", id, min: "0", max: "100", value: "50", "aria-label": `Divider position, ${lab}` });
+      const set = (p) => { frame.style.setProperty("--pos", p + "%"); range.value = p; };
+      range.addEventListener("input", () => set(+range.value));
+      const fromPointer = (e) => { const r = frame.getBoundingClientRect(); set(Math.round(Math.min(100, Math.max(0, (e.clientX - r.left) / r.width * 100)))); };
+      frame.addEventListener("pointerdown", (e) => { frame.setPointerCapture(e.pointerId); fromPointer(e); });
+      frame.addEventListener("pointermove", (e) => { if (frame.hasPointerCapture(e.pointerId)) fromPointer(e); });
+      const gt = el("div", { class: "gtline" }, [el("img", { src: IMG(`twostage/gt/${n}.webp`), alt: `Ground truth ${n}`, width: "48", height: "48" }), el("span", { html: `<span class="${cls}">${lab}</span> ground truth` })]);
+      root.append(el("div", { class: "swipe" }, [frame, range, gt]));
+    });
+  }
+  segmented($("seg-ts"), Object.entries(TS).map(([k, v]) => [k, v[2]]), tsPair, (v) => { tsPair = v; renderTS(); });
+  renderTS();
+
+  /* ---------- Table (Table 1 of the paper) ---------- */
+  // Columns: Fruits, Animals (seen) | Vehicles, Flowers (unseen); each PSNR↑ SSIM↑ LPIPS↓.
+  const T = {
+    ks: [
+      ["DAD", false, [17.4659, .6177, .3421, 17.4190, .6464, .4258, 11.0882, .4320, .5035, 11.4455, .3870, .5221]],
+      ["GIP", false, [17.7661, .5878, .3801, 17.6130, .5867, .4935, 14.0750, .5094, .5084, 14.0897, .4822, .5036]],
+      ["BIDeN", false, [20.1024, .7373, .1856, 19.9016, .7151, .2326, 15.4370, .5521, .3848, 15.6904, .5416, .3786]],
+      ["LCD", false, [23.0439, .8124, .1317, 23.0637, .7951, .2486, 17.2084, .6891, .2926, 17.1864, .6553, .2981]],
+      ["DoubleDIP", true, [14.5998, .5353, .4841, 14.5688, .5063, .5866, 13.6961, .4804, .5099, 13.7094, .4373, .5254]],
+      ["Ours", true, [21.3585, .8036, .1305, 21.3605, .8232, .1530, 20.2285, .8169, .1212, 20.4173, .8061, .1174]],
+    ],
+    us: [
+      ["DAD", false, [17.8717, .6268, .3442, 17.5182, .6386, .4270, 14.8977, .5271, .4665, 15.7912, .5428, .4321]],
+      ["BIDeN", false, [20.0736, .7421, .1984, 19.8612, .7227, .2522, 14.5171, .4955, .4639, 15.6499, .5384, .3991]],
+      ["DoubleDIP", true, [14.8364, .5357, .4999, 14.5533, .4956, .6034, 13.4726, .4376, .5704, 14.4653, .4692, .4909]],
+      ["Ours", true, [20.0277, .7580, .1740, 19.5373, .7688, .2063, 18.8996, .7713, .1544, 20.0608, .7880, .1262]],
+    ],
+    sv: [
+      ["DAD", false, [16.6207, .6133, .3624, 17.2792, .6652, .3935, 14.5038, .5549, .4296, 14.8550, .5252, .4409]],
+      ["BIDeN", false, [18.2093, .6917, .2467, 18.6529, .6901, .2777, 14.6763, .5283, .4225, 15.0080, .5207, .4055]],
+      ["DoubleDIP", true, [13.5931, .4878, .5383, 13.8303, .4433, .6500, 12.9660, .4104, .5742, 13.1423, .3845, .5778]],
+      ["Ours", true, [17.9099, .7152, .2103, 18.1943, .7498, .2132, 17.8124, .7553, .1665, 18.3451, .7500, .1575]],
+    ],
+  };
+  function renderTable(sc) {
+    const rows = T[sc];
+    const best = Array.from({ length: 12 }, (_, j) => {
+      const col = rows.map((r) => r[2][j]);
+      return j % 3 === 2 ? Math.min(...col) : Math.max(...col);
+    });
+    const doms = [["Fruits", "seen"], ["Animals", "seen"], ["Vehicles", "unseen"], ["Flowers", "unseen"]];
+    let h = "<thead><tr><th rowspan=\"2\">Method</th>";
+    for (const [d, s] of doms) h += `<th class="grp" colspan="3">${d}<span class="domain-tag">${s}</span></th>`;
+    h += "</tr><tr>";
+    for (let i = 0; i < 4; i++) h += `<th class="g0">PSNR ↑</th><th>SSIM ↑</th><th>LPIPS ↓</th>`;
+    h += "</tr></thead><tbody>";
+    for (const [name, tf, v] of rows) {
+      h += `<tr class="${name === "Ours" ? "ours" : ""}"><td>${name}${tf ? '<span class="tf">TF</span>' : ""}</td>`;
+      v.forEach((x, j) => { h += `<td class="${j % 3 === 0 ? "g0 " : ""}${x === best[j] ? "best" : ""}">${x.toFixed(3)}</td>`; });
+      h += "</tr>";
+    }
+    $("table").innerHTML = h + "</tbody>";
+  }
+  segmented($("seg-tab"), SCEN, "ks", renderTable);
+  renderTable("ks");
+
+  /* ---------- BibTeX copy ---------- */
+  $("copy-bib").addEventListener("click", async (e) => {
+    const btn = e.currentTarget, txt = $("bib-text").textContent;
+    try { await navigator.clipboard.writeText(txt); btn.textContent = "Copied"; }
+    catch { const r = document.createRange(); r.selectNodeContents($("bib-text")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "Selected, press Ctrl+C"; }
+    setTimeout(() => (btn.textContent = "Copy"), 1800);
+  });
+})();
+</script>
+</body>
+</html>
