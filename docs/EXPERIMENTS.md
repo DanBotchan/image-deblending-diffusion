@@ -31,22 +31,32 @@ Candidate-budget seeds beyond the ten stored per pair are derived deterministica
 `manifests/auto_prompts/`; pass `--generate-prompts` to rerun Qwen2-VL instead.
 `scripts/render_timestep_heatmaps.py <timestep summary.csv>` draws the supplementary heatmaps.
 
-## Current-paper audit caveats
+## Held-out Vehicles and Flowers
 
-The [2026-10-31 audit](REPRODUCIBILITY_AUDIT_2026-10-31.md) found that the current
-supplement also includes alpha-map accuracy and out-of-family matte experiments,
-which do not have release drivers. The current automated-prompt table uses matched blends by default; pass
-`--legacy-blends` for the older as-run variant.
-The candidate-budget table reads sampling-time RGB SSIM / VGG LPIPS, whereas the
-driver's summary uses grayscale SSIM / AlexNet LPIPS, so those summaries do not
-reproduce the table's metric definition. See the audit for sampled evidence and
-fresh-run limitations, including the release’s LPIPS guidance frequency change
-from every guided timestep in the legacy code to every fourth timestep.
+The held-out split uses the main experiment configuration and the 100-pair manifests in
+`manifests/generalization/`. Point `--data-root` at the prepared held-out images.
+
+```bash
+for scenario in known_scalar unknown_scalar spatial; do
+  python scripts/reproduce.py main --scenario "$scenario" --split generalization \
+    --data-root /absolute/path/to/BID_generalization
+done
+```
+
+Add `--gpus 0,1,2,3` to distribute pairs across four GPUs. Each run writes `summary.md`
+and `summary.csv` under `outputs/generalization/main/<scenario>/` by default.
+
+## Release coverage and metrics
+
+The alpha-map accuracy and out-of-family matte experiments are outside the driver's
+coverage. The candidate-budget table uses sampling-time RGB SSIM and VGG LPIPS. The
+driver reports PSNR, grayscale SSIM, and AlexNet LPIPS after ordering each pair to
+minimize total mean squared error against ground truth. The release applies LPIPS guidance
+every fourth guided timestep. The original main runs applied it at every guided timestep.
 
 ## Canonical method settings
 
-All values come from `configs/paper/<scenario>_stage{1,2}.yaml`, recovered from the saved
-canonical run configurations.
+The main experiment uses `configs/paper/<scenario>_stage{1,2}.yaml`.
 
 | Setting | Known scalar | Unknown scalar | Spatial |
 |---|---:|---:|---:|
@@ -59,8 +69,7 @@ canonical run configurations.
 
 ## Supplementary runs that deviated from the canonical settings
 
-The drivers reproduce what was run. These deviations are therefore encoded explicitly in
-`paper_repro/experiments.py` (marked `AS RUN`) instead of being silently normalized:
+These experiments use the settings below.
 
 - **Timestep and recurrence grids**: Stage 2 keeps the alpha map fixed at its Stage-1
   estimate (`alphas=constant`) instead of continuing to optimize it.
@@ -74,9 +83,3 @@ The drivers reproduce what was run. These deviations are therefore encoded expli
   for the older variant.
 - **DoubleDIP best-of-three**: the paper's selection paired outputs with prompts in
   ground-truth source order; see `docs/BASELINES.md` for the flags that reproduce it.
-
-## Determinism
-
-Sampling uses fixed per-pair seeds and is bit-for-bit repeatable on a given GPU and software
-stack. The paper's artifacts came from an older codebase and environment, so reruns match the
-paper statistically rather than pixel-for-pixel; see `docs/VERIFICATION.md`.
