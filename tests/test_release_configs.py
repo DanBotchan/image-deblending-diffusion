@@ -17,6 +17,16 @@ EXPECTED = {
 }
 
 
+def test_stage_one_model_dependencies_import_without_checkpoints():
+    from torch.nn import Module
+
+    from models.latent_diffusion.util import get_obj_from_str
+
+    model = OmegaConf.load(Path(CONFIG_ROOT) / "model" / "stable.yaml").model
+    assert issubclass(get_obj_from_str(model.target), Module)
+    assert issubclass(get_obj_from_str(model.params.cond_stage_config.target), Module)
+
+
 @pytest.mark.parametrize("name", EXPECTED)
 def test_paper_config_matches_recorded_protocol(name, monkeypatch):
     monkeypatch.setenv("DEBLEND_STAGE2_MANIFEST", "/tmp/selected.csv")

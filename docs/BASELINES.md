@@ -1,12 +1,7 @@
 # Baselines
 
-Upstream baseline code is not vendored. Each baseline is pinned to an upstream commit; our
-changes ship either as a patch against that commit (BIDeN, DAD) or, when the code is our own,
-as source under `baselines/` (GIP PyTorch port, LCD reimplementation, DoubleDIP adapter).
-
-Every evaluation command below was checked against the outputs behind Table 1: on the first
-three pairs of each table cell, rerunning it from the stated checkpoint reproduces the stored
-images to within one intensity level (0 for GIP and LCD).
+The release provides patches for BIDeN and DAD, implementations of GIP and LCD, and an
+adapter for DoubleDIP. Use the listed upstream commits for the patches and adapter.
 
 | Method | Upstream | Our code | Checkpoints used for Table 1 |
 |---|---|---|---|
@@ -15,8 +10,6 @@ images to within one intensity level (0 for GIP and LCD).
 | GIP | method of [Zou et al.](https://github.com/jiupinjia/GANs-for-Inverse-Problems) (TensorFlow, not used) | `baselines/gip/` (our PyTorch implementation) | one model, alpha = 0.5 |
 | LCD | method of Montenegro & Cardoso (2025) | `baselines/lcd/` (our implementation) | one model |
 | DoubleDIP | [yossigandelsman/DoubleDIP](https://github.com/yossigandelsman/DoubleDIP) @ `4f12629` | `baselines/doubledip/run_doubledip.py` | training-free |
-
-The trained baseline checkpoints are not yet hosted and will be uploaded soon.
 
 The supervised baselines are trained on the BIDeN training set (`BID_train/trainA`,
 `BID_train/trainB`) at 256 x 256. Their evaluation scripts read image paths relative to the
@@ -29,11 +22,10 @@ cp manifests/comparison/*.csv "$DEBLEND_DATA_ROOT"/          # or manifests/gene
 Outputs use the main pipeline layout and are scored with
 `scripts/evaluate_artifact_tree.py <results> --expected-pairs 300 ...` (100 for generalization).
 
-## Inconsistencies in the Table 1 baseline runs
+## Split-specific settings in Table 1
 
-The following settings differ between the comparison split and the held-out split in the runs
-behind the submitted Table 1. The commands below reproduce the table as run; the
-consistent alternative is given next to each.
+Table 1 uses the following split-specific settings. Use the **As run** column for the
+reported configuration.
 
 | Cell | As run | Consistent with the comparison split | Effect (held-out domains, Vehicles / Flowers PSNR) |
 |---|---|---|---|

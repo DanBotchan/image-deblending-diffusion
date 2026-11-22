@@ -9,11 +9,13 @@ build/
 dist/
 .venv/
 venv/
+.env
+.env.*
+!.env.example
 outputs/
 checkpoints/*
 !checkpoints/README.md
-data_external/*
-!data_external/README.md
+data_external/
 *.ckpt
 *.pt
 *.pth

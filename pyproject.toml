@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Training-free two-source image deblending with diffusion priors"
 readme = "README.md"
 license = {text = "Apache-2.0"}
-requires-python = ">=3.9,<3.11"
+requires-python = ">=3.9,<3.12"
 authors = [
   {name = "Dan Botchan"},
   {name = "Ohad Fried"},
@@ -25,19 +25,21 @@ dependencies = [
   "matplotlib==3.7.4",
   "numpy==1.26.4",
   "omegaconf==2.3.0",
-  "opencv-python==4.8.0.76",
+  "opencv-python-headless==4.10.0.84",
   "pandas==2.1.4",
   "Pillow==9.2.0",
-  "pytorch-lightning==1.6.5",
+  "pytorch-lightning==1.6.5.post0",
   "PyYAML==6.0",
   "scikit-image==0.22.0",
   "scipy==1.11.4",
-  "taming-transformers==0.0.1",
+  "setuptools<82",  # Lightning 1.6 imports pkg_resources at runtime.
+  "taming-transformers-rom1504==0.0.6",
   "torch==2.5.1",
+  "torchmetrics==0.11.4",
   "torchvision==0.20.1",
   "tqdm==4.67.1",
   "transformers==4.47.1",
-  "clip @ git+https://github.com/openai/CLIP.git@a1d071733d7111c9c014f024669f959182114e33",
+  "clip @ git+https://github.com/openai/CLIP.git@d05afc436d78f1c48dc0dbf8e5980a9d471f35f6",
 ]
 
 [project.optional-dependencies]
